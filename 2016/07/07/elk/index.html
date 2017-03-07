@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no" />
+<meta name="author" content="Ray" />
+
+
+
+<meta name="description" content="缘起在微服务开发过程中，一般都会利用多台服务器做分布式部署，如何能够把分散在各个服务器中的日志归集起来做分析处理，是一个微服务服务需要考虑的一个因素。
+搭建一个日志系统搭建一个日志系统需要考虑一下一些因素：
+
+利用什么技术，是自己实现还利用现成的组件
+日志需要定义统一的格式
+日志需要拥有一个锚点来进行全局跟踪
+
+第一个问题，针对我们小公司来说，基本没有自己的研发能力，绝对是选用第三方开源的组件了。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="用ELK搭建简单的日志收集分析系统">
+<meta property="og:url" content="http://lzw2006.github.io/2016/07/07/elk/index.html">
+<meta property="og:site_name" content="Ray的博客">
+<meta property="og:description" content="缘起在微服务开发过程中，一般都会利用多台服务器做分布式部署，如何能够把分散在各个服务器中的日志归集起来做分析处理，是一个微服务服务需要考虑的一个因素。
+搭建一个日志系统搭建一个日志系统需要考虑一下一些因素：
+
+利用什么技术，是自己实现还利用现成的组件
+日志需要定义统一的格式
+日志需要拥有一个锚点来进行全局跟踪
+
+第一个问题，针对我们小公司来说，基本没有自己的研发能力，绝对是选用第三方开源的组件了。">
+<meta property="og:image" content="http://img.blog.csdn.net/20160429111734088">
+<meta property="og:image" content="http://img.blog.csdn.net/20160429114432220">
+<meta property="og:image" content="http://img.blog.csdn.net/20160429144903637">
+<meta property="og:image" content="http://img.blog.csdn.net/20160429151020161">
+<meta property="og:image" content="http://img.blog.csdn.net/20160429151453885">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/wechat.png">
+<meta property="og:updated_time" content="2016-12-23T07:45:41.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="用ELK搭建简单的日志收集分析系统">
+<meta name="twitter:description" content="缘起在微服务开发过程中，一般都会利用多台服务器做分布式部署，如何能够把分散在各个服务器中的日志归集起来做分析处理，是一个微服务服务需要考虑的一个因素。
+搭建一个日志系统搭建一个日志系统需要考虑一下一些因素：
+
+利用什么技术，是自己实现还利用现成的组件
+日志需要定义统一的格式
+日志需要拥有一个锚点来进行全局跟踪
+
+第一个问题，针对我们小公司来说，基本没有自己的研发能力，绝对是选用第三方开源的组件了。">
+<meta name="twitter:image" content="http://img.blog.csdn.net/20160429111734088">
+
+<link rel="apple-touch-icon" href= "/apple-touch-icon.png">
+
+
+    <link rel="alternative" href="/atom.xml" title="Ray的博客" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title>用ELK搭建简单的日志收集分析系统 | Ray的博客</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        open_in_new: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: undefined
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Ray</a></h1>
+        </hgroup>
+
+        
+        <p class="header-subtitle">Java攻城狮|经济小学徒|模型小爱好</p>
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">所有文章</a></li>
+                        
+                            <li><a href="/tags/">标签云</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:rayleung_xyz@126.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                                <a class="fa RSS" target="_blank" href="/atom.xml" title="RSS"></a>
+                            
+                                <a class="fa CSDN" target="_blank" href="http://blog.csdn.net/lzw_2006" title="CSDN"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/JAVA/">JAVA</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/">JVM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mybatis/">Mybatis</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/ORM/">ORM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/">Thread</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/spring/">spring</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/spring-cloud/">spring-cloud</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/中间件/">中间件</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/其他/">其他</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/基础设施/">基础设施</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/念念碎/">念念碎</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/技术/">技术</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/日志归集/">日志归集</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/架构/">架构</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/系统限流/">系统限流</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a target="_blank" class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                      <a target="_blank" class="main-nav-link switch-friends-link" href="http://lixuanbin.github.io/">秦沙</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">喜欢IT技术，喜欢经济，喜欢模型</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Ray</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Ray</a></h1>
+            </hgroup>
+            
+            <p class="header-subtitle">Java攻城狮|经济小学徒|模型小爱好</p>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">所有文章</a></li>
+                
+                    <li><a href="/tags/">标签云</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:rayleung_xyz@126.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                                <a class="fa RSS" target="_blank" href="/atom.xml" title="RSS"></a>
+                            
+                                <a class="fa CSDN" target="_blank" href="http://blog.csdn.net/lzw_2006" title="CSDN"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我"/>
+</nav>
+      <div class="body-wrap"><article id="post-elk" class="article article-type-post" itemscope itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2016/07/07/elk/" class="article-date">
+      <time datetime="2016-07-07T01:13:58.000Z" itemprop="datePublished">2016-07-07</time>
+</a>
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy" />
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      用ELK搭建简单的日志收集分析系统
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/基础设施/">基础设施</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/技术/">技术</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/日志归集/">日志归集</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <h1 id="缘起"><a href="#缘起" class="headerlink" title="缘起"></a>缘起</h1><p>在微服务开发过程中，一般都会利用多台服务器做分布式部署，如何能够把分散在各个服务器中的日志归集起来做分析处理，是一个微服务服务需要考虑的一个因素。</p>
+<h1 id="搭建一个日志系统"><a href="#搭建一个日志系统" class="headerlink" title="搭建一个日志系统"></a>搭建一个日志系统</h1><p>搭建一个日志系统需要考虑一下一些因素：</p>
+<ol>
+<li>利用什么技术，是自己实现还利用现成的组件</li>
+<li>日志需要定义统一的格式</li>
+<li>日志需要拥有一个锚点来进行全局跟踪</li>
+</ol>
+<p>第一个问题，针对我们小公司来说，基本没有自己的研发能力，绝对是选用第三方开源的组件了。ELK配置比较简单，有现成的UI界面，容易检索日志信息，是首选。<br>第二个问题，利用log4j2定义好统一的日志格式，利用logstash过滤日志内容。<br>第三个问题，全局跟踪的ID有几种生产方式，一种是利用UUID或者生成随机数，一种是利用数据库来生成sequence number，还可以通过自定义一个id生成服务来获取。考虑到自身服务的需要，这里选用生成随机数来实现。</p>
+<a id="more"></a>
+<h1 id="日志系统架构"><a href="#日志系统架构" class="headerlink" title="日志系统架构"></a>日志系统架构</h1><p><img src="http://img.blog.csdn.net/20160429111734088" alt="ELK简单架构"></p>
+<p>从左边看起，每一台webserver上都会部署一个logstash-agent,它的作用是用类似tailf的方式监听日志文件，然后把新添加的日志发送到redis队列里面，logstash-indexer负责从redis相应的队列里面取出日志，对日志进进行加工后输出到elasticsearch中，elasticsearch会根据要求对日志进行索引归集，最后用户可以通过kibana来查看和分析日志。</p>
+<h1 id="开始搭建日志系统"><a href="#开始搭建日志系统" class="headerlink" title="开始搭建日志系统"></a>开始搭建日志系统</h1><p><strong>准备工作</strong></p>
+<ol>
+<li>安装JDK8</li>
+<li>安装Redis2.8</li>
+</ol>
+<p>这里不涉及怎样安装JDK和Redis，请自行查阅资料</p>
+<p>使用<strong>logstash2.3.1</strong>, <strong>elasticsearch2.3.1</strong>, <strong>kibana2.3.1</strong></p>
+<p>首先去ELK官网下载相应的压缩包<br><a href="https://www.elastic.co/downloads" target="_blank" rel="external">https://www.elastic.co/downloads</a></p>
+<h2 id="在webserver上安装logstash-agent"><a href="#在webserver上安装logstash-agent" class="headerlink" title="在webserver上安装logstash-agent"></a>在webserver上安装logstash-agent</h2><p>1.解压 <code>tar -zxvf logstash2.3.1</code><br>2.检验安装是否成功 <code>bin/logstash -e &quot;input{stdin{}}output{stdout{}}&quot;</code>,然后在终端输入hello，看看有没有内容返回<br><img src="http://img.blog.csdn.net/20160429114432220" alt="安装logstash"><br>3.编写配置文件<code>logstash_agent.conf</code><br>在logstash安装目录下新建conf文件夹，在里面新建配置文件<code>logstash_agent.conf</code><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line">input &#123;</div><div class="line">        file &#123;</div><div class="line">                type =&gt; &quot;customer_service&quot;</div><div class="line">                #需要收集的日志文件</div><div class="line">                path =&gt; [&quot;/home/java/logs/cust/customer-service-*.log&quot;] </div><div class="line">                tags =&gt; [&quot;customer-service&quot;, &quot;log4j2&quot;]</div><div class="line">                #              </div><div class="line">                codec =&gt; multiline &#123; #</div><div class="line">                        pattern =&gt; &quot;^%&#123;TIMESTAMP_ISO8601&#125;&quot;</div><div class="line">                        negate =&gt; true</div><div class="line">                        what =&gt; &quot;previous&quot;</div><div class="line">                &#125;</div><div class="line">        &#125;</div><div class="line">&#125;</div><div class="line">output &#123;</div><div class="line">        redis &#123;</div><div class="line">                host =&gt; &quot;192.168.235.195&quot;</div><div class="line">                data_type =&gt; &quot;list&quot;</div><div class="line">                key =&gt; &quot;logstash:redis:customer&quot;</div><div class="line">        &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>4.后台启动<br><code>nohup ./bin/logstash -f conf/logstash_agent.conf &amp;</code></p>
+<h2 id="在日志server上安装elasticsearch"><a href="#在日志server上安装elasticsearch" class="headerlink" title="在日志server上安装elasticsearch"></a>在日志server上安装elasticsearch</h2><p>1.解压<code>tar -zxvf elasticsearch-2.3.1.tar.gz</code><br>2.修改安装目录下的配置文件<code>config/elasticsearch.yml</code><br>把network.host字段给反注释掉，把地址改为0.0.0.0（官方并没明确说要去改这配置，默认配置应该就可以了，不过实测的时候发现如果不做这修改，elasticsearch访问不了）<br><img src="http://img.blog.csdn.net/20160429144903637" alt="这里写图片描述"><br>3.后台启动elasticsearch<br><code>nohup ./bin/elasticsearch &amp;</code></p>
+<h2 id="在日志server上安装logstash-indexer"><a href="#在日志server上安装logstash-indexer" class="headerlink" title="在日志server上安装logstash-indexer"></a>在日志server上安装logstash-indexer</h2><p>与<code>在webserver上安装logstash-agent</code>一节基本相同，只是配置文件不一样，这里使用<code>logstash-indexer.conf</code></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div></pre></td><td class="code"><pre><div class="line">input &#123;</div><div class="line">        redis &#123;</div><div class="line">                host =&gt; &quot;localhost&quot; #redis地址</div><div class="line">                data_type =&gt; &quot;list&quot;</div><div class="line">                key =&gt; &quot;logstash:redis:customer&quot;</div><div class="line">                type =&gt; &quot;redis-input&quot;</div><div class="line">        &#125;</div><div class="line">&#125;</div><div class="line">filter &#123;</div><div class="line">    grok &#123;</div><div class="line">        match =&gt; &#123;</div><div class="line">            &quot;message&quot; =&gt; &quot;%&#123;TIMESTAMP_ISO8601:date&#125; \[(?&lt;thread_name&gt;.+?)\] (?&lt;log_level&gt;\w+)\s*(?&lt;content&gt;.*)&quot;</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line">    date &#123;</div><div class="line">        match =&gt; [&quot;timestamp&quot;, &quot;dd/MMM/YYYY:HH:mm:ss Z&quot;]</div><div class="line">    &#125;</div><div class="line">&#125;</div><div class="line">output &#123;</div><div class="line">        if[type] == &quot;customer_service&quot; &#123;</div><div class="line">	        elasticsearch &#123;</div><div class="line">	                #embedded =&gt; false</div><div class="line">	                #protocol =&gt; &quot;http&quot;</div><div class="line">	                hosts =&gt; &quot;localhost:9200&quot;</div><div class="line">	                index =&gt; &quot;customer-%&#123;+YYYY.MM.dd&#125;&quot;</div><div class="line">	        &#125;</div><div class="line">        &#125;else if[type] == &quot;其他类型&quot; &#123;</div><div class="line">			elasticsearch &#123;</div><div class="line">	                #embedded =&gt; false</div><div class="line">	                #protocol =&gt; &quot;http&quot;</div><div class="line">	                hosts =&gt; &quot;localhost:9200&quot;</div><div class="line">	                index =&gt; &quot;其他类型索引名字-%&#123;+YYYY.MM.dd&#125;&quot;</div><div class="line">	        &#125;</div><div class="line">		&#125;else &#123;</div><div class="line">			//做其他处理</div><div class="line">		&#125;</div><div class="line">        stdout&#123; #输出到标准输出，可以去掉</div><div class="line">        &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>启动<code>logstash-indexer</code><br><code>nohup ./bin/logstash -f conf/logstash-indexer.conf &amp;</code></p>
+<h2 id="在日志server上安装kibana"><a href="#在日志server上安装kibana" class="headerlink" title="在日志server上安装kibana"></a>在日志server上安装kibana</h2><p>1.解压<code>tar -zxvf kibana-4.5.0-linux-x64.gz</code><br>2.后台启动kibana <code>nohup ./bin/kibana &amp;</code><br>这里没有特别去配置kibana要访问的elasticsearch地址，默认它会找本地的，如果需要，可以到conf/kibana.yml修改</p>
+<h2 id="配置log4j2的日志格式"><a href="#配置log4j2的日志格式" class="headerlink" title="配置log4j2的日志格式"></a>配置log4j2的日志格式</h2><p><code>&lt;PatternLayout pattern=&quot;%d{ISO8601} %t %level %msg%n&quot;/&gt;</code></p>
+<h2 id="访问kibana主页"><a href="#访问kibana主页" class="headerlink" title="访问kibana主页"></a>访问kibana主页</h2><p>1.打开kibana主页<a href="http://your-kibana-ip:5601/" target="_blank" rel="external">http://your-kibana-ip:5601/</a><br>2.输入索引<code>customer-*</code>，并点击<code>create</code><br><img src="http://img.blog.csdn.net/20160429151020161" alt="这里写图片描述"><br>3.在Discover页面观察日志<br><img src="http://img.blog.csdn.net/20160429151453885" alt="这里写图片描述"></p>
+<h1 id="清理Elasticsearch索引"><a href="#清理Elasticsearch索引" class="headerlink" title="清理Elasticsearch索引"></a>清理Elasticsearch索引</h1><p>索引放久了需要清理，清理所以可以使用Elasticsearch的API。<br>例如我需要删除某个索引2016年5月份的所有索引，可以使用下面的命令：</p>
+<p><code>curl -XDELETE &#39;http://localhost:9200/customer-2016.05.*&#39;</code></p>
+<p>更多API可以查阅Elastic官网<br><a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-delete.html" target="_blank" rel="external">https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-delete.html</a></p>
+<h1 id="遇到的一些问题"><a href="#遇到的一些问题" class="headerlink" title="遇到的一些问题"></a>遇到的一些问题</h1><h2 id="分片错误"><a href="#分片错误" class="headerlink" title="分片错误"></a>分片错误</h2><p>突然发现ES一直没数据，于是重启ES，发现一直在刷日志，其中出现什么failed shard recovery问题，网上找了一下，发现这个解决方法<br><a href="http://my.oschina.net/secisland/blog/688314" target="_blank" rel="external">http://my.oschina.net/secisland/blog/688314</a></p>
+<blockquote>
+<p>今天早上Elasticsearch莫名奇怪的报错了。整个控制台不停的打印出<br>  [2016-06-07 08:55:00,976][WARN ][indices.cluster          ] [secilog] [[seci-201<br>  606][1]] marking and sending shard failed due to [failed recovery]<br>  org.elasticsearch.index.gateway.IndexShardGatewayRecoveryException: [seci-201606<br>  ][1] failed recovery  at org.elasticsearch.index.gateway.IndexShardGatewayService$1.run(IndexS<br>  hardGatewayService.java:162)<br>  [2016-06-07 08:40:41,967][WARN ][cluster.action.shard     ] [secilog] [seci-201606][1] received shard failed for [seci-201606][1], node[xGIRwM34TdWcKgV95BI74g], [P], s[INITIALIZING], indexUUID [t75Egn6rT2WyBYQk_2X3IQ], reason [shard failure [failed recovery][IndexShardGatewayRecoveryException[[seci-201606][1] failed recovery]; nested: EngineCreationFailureException[[seci-201606][1] failed to create engine]; nested: CorruptIndexException[codec footer mismatch: actual footer=-464453631 vs expected footer=-1071082520 (resource: MMapIndexInput(path=”D:\secisland\secilog\elasticsearch\data\192.168.21.5\nodes\0\indices\seci-201606\1\index_6exw.cfs”))]; ]]<br>  通过错误内容大概可以看出是数据的一个分片出了问题。这个问题的解决在网上比较少，特在此介绍一下。<br>  检查：localhost:9200/_cluster/health<br>  从内容上可以看出有红色的状态，表示出了比较严重的问题。<br>  问题解决：<br>  先停掉Elasticsearch。<br>  转到Elasticsearch的lib目录<br>  在目录下执行java -cp lucene-core-4.10.4.jar -ea:org.apache.lucene… org.apache.lucene.index.CheckIndex D:\secisland\secilog\elasticsearch\data\192.168.21.5\nodes\0\indices\seci-201606\1\index -fix<br>  然后重启看下是否好了。如果还没有好可以再次停掉Elasticsearch。<br>  到D:\secisland\secilog\elasticsearch\data\192.168.21.5\nodes\0\indices\seci-201606\1\translog目录。<br>  删掉里面的*.recovery文件。<br>  然后重启Elasticsearch。<br>  这样就解决了分片损坏的问题。</p>
+</blockquote>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p><a href="http://www.cnblogs.com/yjf512/p/4199105.html" target="_blank" rel="external">http://www.cnblogs.com/yjf512/p/4199105.html</a><br><a href="http://www.csdn123.com/html/topnews201408/34/15334.htm" target="_blank" rel="external">http://www.csdn123.com/html/topnews201408/34/15334.htm</a><br><a href="http://www.cnblogs.com/xing901022/p/4805586.html" target="_blank" rel="external">http://www.cnblogs.com/xing901022/p/4805586.html</a><br><a href="https://github.com/chenryn/logstash-best-practice-cn/blob/master/codec/multiline.md" target="_blank" rel="external">https://github.com/chenryn/logstash-best-practice-cn/blob/master/codec/multiline.md</a><br><a href="http://www.open-open.com/lib/view/open1451801542042.html" target="_blank" rel="external">http://www.open-open.com/lib/view/open1451801542042.html</a></p>
+<p>欢迎关注个人公众号<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/wechat.png" alt="Ray乐园"></p>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2016/07/07/elk/">用ELK搭建简单的日志收集分析系统</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Ray</a></p>
+        <p><span>发布时间:</span>2016-07-07, 09:13:58</p>
+        <p><span>最后更新:</span>2016-12-23, 15:45:41</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2016/07/07/elk/" title="用ELK搭建简单的日志收集分析系统">http://lzw2006.github.io/2016/07/07/elk/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://lzw2006.github.io/2016/07/07/elk/　　作者: Ray" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target = "_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2016/07/12/rate-limit5/">
+                    系统限流实践 - 接入层限流(下*完结)
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2016/07/06/rate-limit4/">
+                    系统限流实践 - 接入层限流(上)
+                </a>
+            </div>
+        
+    </nav>
+
+
+<!-- 打赏代码 -->
+<div class="post-donate">
+    <div id="donate_board" class="donate_bar center">
+        <a id="btn_donate" class="btn_donate" href="javascript:;" title="Donate 打赏" target="_blank"></a>
+        <span class="donate_txt">
+           ↑<br>
+
+            欣赏此文？赏份狗粮！
+
+        </span>
+        <br>
+    </div>
+
+    <div id="donate_guide" class="donate_bar center hidden">
+
+        <a href="http://7xsmef.com1.z0.glb.clouddn.com/ali_pay.png" title="支付宝打赏" class="fancybox" rel="article0" style="float:left;margin-left:25%;margin-right:2px;" target="_blank">
+            <img src="http://7xsmef.com1.z0.glb.clouddn.com/ali_pay.png" title="支付宝打赏" height="164px" width="164px">
+        </a>
+
+
+
+        <a href="http://7xsmef.com1.z0.glb.clouddn.com/wechat_pay.JPG" title="微信打赏" class="fancybox" rel="article0" target="_blank">
+            <img src="http://7xsmef.com1.z0.glb.clouddn.com/wechat_pay.JPG" title="微信打赏" height="164px" width="164px">
+        </a>
+
+
+    </div>
+
+    <script type="text/javascript">
+        document.getElementById('btn_donate').onclick = function(){
+            $('#donate_board').addClass('hidden');
+            $('#donate_guide').removeClass('hidden');
+        }
+    </script>
+</div>
+<!-- 打赏代码END -->
+  
+</article>
+
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#缘起"><span class="toc-number">1.</span> <span class="toc-text">缘起</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#搭建一个日志系统"><span class="toc-number">2.</span> <span class="toc-text">搭建一个日志系统</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#日志系统架构"><span class="toc-number">3.</span> <span class="toc-text">日志系统架构</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#开始搭建日志系统"><span class="toc-number">4.</span> <span class="toc-text">开始搭建日志系统</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#在webserver上安装logstash-agent"><span class="toc-number">4.1.</span> <span class="toc-text">在webserver上安装logstash-agent</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#在日志server上安装elasticsearch"><span class="toc-number">4.2.</span> <span class="toc-text">在日志server上安装elasticsearch</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#在日志server上安装logstash-indexer"><span class="toc-number">4.3.</span> <span class="toc-text">在日志server上安装logstash-indexer</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#在日志server上安装kibana"><span class="toc-number">4.4.</span> <span class="toc-text">在日志server上安装kibana</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#配置log4j2的日志格式"><span class="toc-number">4.5.</span> <span class="toc-text">配置log4j2的日志格式</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#访问kibana主页"><span class="toc-number">4.6.</span> <span class="toc-text">访问kibana主页</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#清理Elasticsearch索引"><span class="toc-number">5.</span> <span class="toc-text">清理Elasticsearch索引</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#遇到的一些问题"><span class="toc-number">6.</span> <span class="toc-text">遇到的一些问题</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#分片错误"><span class="toc-number">6.1.</span> <span class="toc-text">分片错误</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#参考资料"><span class="toc-number">7.</span> <span class="toc-text">参考资料</span></a></li></ol>
+</div>
+<style>
+    .left-col .switch-btn,
+    .left-col .switch-area {
+        display: none;
+    }
+</style>
+
+<input type="button" id="tocButton" value="隐藏目录"  title="点击按钮隐藏或者显示文章目录">
+
+<script>
+    yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+</script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></i></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":"用ELK搭建简单的日志收集分析系统　| Ray的博客　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+      <div class="duoshuo" id="comments">
+    <div id="comment-box" ></div>
+    <div class="ds-thread" data-thread-key="2016/07/07/elk/" data-title="用ELK搭建简单的日志收集分析系统" data-url="http://lzw2006.github.io/2016/07/07/elk/"></div>
+    <script>
+        var duoshuoQuery = {short_name:"rayleung"};
+        var loadComment = function(){
+            var d = document, s = d.createElement('script');
+            s.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+            s.async = true; s.charset = 'UTF-8';
+            (d.head || d.body).appendChild(s);
+        }
+
+        
+    </script>
+    
+    <script> loadComment(); </script>
+
+</div>
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2016/07/12/rate-limit5/" title="上一篇: 系统限流实践 - 接入层限流(下*完结)">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2016/07/06/rate-limit4/" title="下一篇: 系统限流实践 - 接入层限流(上)">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2017/03/01/thread/">ThreadLocal - 是怎样炼成的</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/12/23/mybatis-1/">Mybatis - 各种方式配置</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/09/20/spring-netfix-register/">Spring Cloud服务发现</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/09/14/spring-config/">Spring Config学习</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/17/codis/">利用Docker安装运行Codis</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/13/jvm-classfile/">我的JVM之旅-ClassFile</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/12/rate-limit5/">系统限流实践 - 接入层限流(下*完结)</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/07/elk/">用ELK搭建简单的日志收集分析系统</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/06/rate-limit4/">系统限流实践 - 接入层限流(上)</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/30/rate-limit3/">系统限流实践 - 分布式限流</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/23/rate-limit2/">系统限流实践 - 应用限流</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/23/rate-limit/">系统限流实践 - 理论篇</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/20/create-hexo-github-site/">利用hexo和github搭建自己的免费博客</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/16/my-new-blog/">终于开通私人博客啦！</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2016-2017 Ray
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.0">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style='display:none'>
+                        <span id="site-visit" >本站到访数: 
+                            <span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>, </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style='display:none'>
+                        <span id="page-visit">本页阅读量: 
+                            <span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 10;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

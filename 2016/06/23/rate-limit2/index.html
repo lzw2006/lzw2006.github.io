@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no" />
+<meta name="author" content="Ray" />
+
+
+
+<meta name="description" content="本文是根据开涛的博客 聊聊高并发系统之限流特技-1 整理而成，自学笔记第二篇
+
+目录1.系统限流实践 - 理论篇2.系统限流实践 - 应用限流3.系统限流实践 - 分布式限流4.系统限流实践 - 接入层限流(上)5.系统限流实践 - 接入层限流(下*完结)
+开篇上篇学习了限流的基本知识(传送门)，接下来学习一下应用限流的方法
+应用级限流针对容器限制总并发/连接/请求数通过对容器进行配置，限制TP">
+<meta property="og:type" content="article">
+<meta property="og:title" content="系统限流实践 - 应用限流">
+<meta property="og:url" content="http://lzw2006.github.io/2016/06/23/rate-limit2/index.html">
+<meta property="og:site_name" content="Ray的博客">
+<meta property="og:description" content="本文是根据开涛的博客 聊聊高并发系统之限流特技-1 整理而成，自学笔记第二篇
+
+目录1.系统限流实践 - 理论篇2.系统限流实践 - 应用限流3.系统限流实践 - 分布式限流4.系统限流实践 - 接入层限流(上)5.系统限流实践 - 接入层限流(下*完结)
+开篇上篇学习了限流的基本知识(传送门)，接下来学习一下应用限流的方法
+应用级限流针对容器限制总并发/连接/请求数通过对容器进行配置，限制TP">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/limit-result-1.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/limit-result-2.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/wechat.png">
+<meta property="og:updated_time" content="2016-12-23T07:45:41.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="系统限流实践 - 应用限流">
+<meta name="twitter:description" content="本文是根据开涛的博客 聊聊高并发系统之限流特技-1 整理而成，自学笔记第二篇
+
+目录1.系统限流实践 - 理论篇2.系统限流实践 - 应用限流3.系统限流实践 - 分布式限流4.系统限流实践 - 接入层限流(上)5.系统限流实践 - 接入层限流(下*完结)
+开篇上篇学习了限流的基本知识(传送门)，接下来学习一下应用限流的方法
+应用级限流针对容器限制总并发/连接/请求数通过对容器进行配置，限制TP">
+<meta name="twitter:image" content="http://7xsmef.com1.z0.glb.clouddn.com/limit-result-1.png">
+
+<link rel="apple-touch-icon" href= "/apple-touch-icon.png">
+
+
+    <link rel="alternative" href="/atom.xml" title="Ray的博客" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title>系统限流实践 - 应用限流 | Ray的博客</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        open_in_new: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: undefined
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Ray</a></h1>
+        </hgroup>
+
+        
+        <p class="header-subtitle">Java攻城狮|经济小学徒|模型小爱好</p>
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">所有文章</a></li>
+                        
+                            <li><a href="/tags/">标签云</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:rayleung_xyz@126.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                                <a class="fa RSS" target="_blank" href="/atom.xml" title="RSS"></a>
+                            
+                                <a class="fa CSDN" target="_blank" href="http://blog.csdn.net/lzw_2006" title="CSDN"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/JAVA/">JAVA</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/">JVM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mybatis/">Mybatis</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/ORM/">ORM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/">Thread</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/spring/">spring</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/spring-cloud/">spring-cloud</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/中间件/">中间件</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/其他/">其他</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/基础设施/">基础设施</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/念念碎/">念念碎</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/技术/">技术</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/日志归集/">日志归集</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/架构/">架构</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/系统限流/">系统限流</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a target="_blank" class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                      <a target="_blank" class="main-nav-link switch-friends-link" href="http://lixuanbin.github.io/">秦沙</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">喜欢IT技术，喜欢经济，喜欢模型</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Ray</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Ray</a></h1>
+            </hgroup>
+            
+            <p class="header-subtitle">Java攻城狮|经济小学徒|模型小爱好</p>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">所有文章</a></li>
+                
+                    <li><a href="/tags/">标签云</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:rayleung_xyz@126.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                                <a class="fa RSS" target="_blank" href="/atom.xml" title="RSS"></a>
+                            
+                                <a class="fa CSDN" target="_blank" href="http://blog.csdn.net/lzw_2006" title="CSDN"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我"/>
+</nav>
+      <div class="body-wrap"><article id="post-rate-limit2" class="article article-type-post" itemscope itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2016/06/23/rate-limit2/" class="article-date">
+      <time datetime="2016-06-23T09:11:48.000Z" itemprop="datePublished">2016-06-23</time>
+</a>
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy" />
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      系统限流实践 - 应用限流
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/技术/">技术</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/架构/">架构</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/系统限流/">系统限流</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <blockquote>
+<p>本文是根据开涛的博客 <a href="http://mp.weixin.qq.com/s?__biz=MzIwODA4NjMwNA==&amp;mid=2652897781&amp;idx=1&amp;sn=ae121ce4c3c37b7158bc9f067fa024c0#rd" target="_blank" rel="external">聊聊高并发系统之限流特技-1</a> 整理而成，自学笔记第二篇</p>
+</blockquote>
+<h1 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h1><p>1.<a href="http://rayleung.xyz/2016/06/23/rate-limit/" target="_blank" rel="external">系统限流实践 - 理论篇</a><br>2.<a href="http://rayleung.xyz/2016/06/23/rate-limit2/" target="_blank" rel="external">系统限流实践 - 应用限流</a><br>3.<a href="http://rayleung.xyz/2016/06/30/rate-limit3/" target="_blank" rel="external">系统限流实践 - 分布式限流</a><br>4.<a href="http://rayleung.xyz/2016/07/06/rate-limit4/" target="_blank" rel="external">系统限流实践 - 接入层限流(上)</a><br>5.<a href="http://rayleung.xyz/2016/07/12/rate-limit5/" target="_blank" rel="external">系统限流实践 - 接入层限流(下*完结)</a></p>
+<h1 id="开篇"><a href="#开篇" class="headerlink" title="开篇"></a>开篇</h1><p>上篇学习了限流的基本知识(<a href="http://rayleung.xyz/2016/06/23/rate-limit/" target="_blank" rel="external">传送门</a>)，接下来学习一下应用限流的方法</p>
+<h1 id="应用级限流"><a href="#应用级限流" class="headerlink" title="应用级限流"></a>应用级限流</h1><h2 id="针对容器限制总并发-连接-请求数"><a href="#针对容器限制总并发-连接-请求数" class="headerlink" title="针对容器限制总并发/连接/请求数"></a>针对容器限制总并发/连接/请求数</h2><p>通过对容器进行配置，限制TPS/QPS阀值，防止大量请求涌入击垮系统。</p>
+<blockquote>
+<p>如果你使用过Tomcat，其Connector 其中一种配置有如下几个参数：<br>  acceptCount：如果Tomcat的线程都忙于响应，新来的连接会进入队列排队，如果超出排队大小，则拒绝连接；<br>  maxConnections：瞬时最大连接数，超出的会排队等待；<br>  maxThreads：Tomcat能启动用来处理请求的最大线程数，如果请求处理量一直远远大于最大线程数则可能会僵死<br>  详细的配置请参考官方文档。另外如Mysql（如max_connections）、Redis（如tcp-backlog）都会有类似的限制连接数的配置</p>
+</blockquote>
+<a id="more"></a>
+<h2 id="针对接口进行并发控制"><a href="#针对接口进行并发控制" class="headerlink" title="针对接口进行并发控制"></a>针对接口进行并发控制</h2><p>如果担心接口某个时刻并发量过大了，可以细粒度地限制每个接口的总并发/请求数<br>可以使用Java得Atomic来实现<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">SimpleLimit</span> </span>&#123;</div><div class="line"></div><div class="line">     <span class="keyword">private</span> AtomicInteger requestCount;</div><div class="line"> </div><div class="line">     <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">doRequest</span><span class="params">(String threadName)</span> </span>&#123;</div><div class="line">         <span class="keyword">try</span> &#123;</div><div class="line">             <span class="keyword">if</span> (requestCount.decrementAndGet() &lt; <span class="number">0</span>) &#123;</div><div class="line">                 System.out.println(threadName + <span class="string">":请求过多，请稍后再尝试"</span>);</div><div class="line">             &#125;<span class="keyword">else</span> &#123;</div><div class="line">                 System.out.println(threadName + <span class="string">":您的请求已受理"</span>);</div><div class="line">             &#125;</div><div class="line">         &#125; <span class="keyword">finally</span> &#123;</div><div class="line">             requestCount.incrementAndGet();</div><div class="line">         &#125;</div><div class="line">     &#125;</div><div class="line">     ......</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>测试代码<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> InterruptedException, IOException </span>&#123;</div><div class="line">        <span class="keyword">final</span> SimpleLimit simpleLimit = <span class="keyword">new</span> SimpleLimit();</div><div class="line">        <span class="keyword">final</span> CountDownLatch latch = <span class="keyword">new</span> CountDownLatch(<span class="number">1</span>); <span class="comment">//保证线程同一时刻start</span></div><div class="line">        simpleLimit.requestCount = <span class="keyword">new</span> AtomicInteger(<span class="number">10</span>);</div><div class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">50</span>; i++) &#123;</div><div class="line">            <span class="keyword">final</span> <span class="keyword">int</span> finalI = i;</div><div class="line">            Thread t = <span class="keyword">new</span> Thread(<span class="keyword">new</span> Runnable() &#123;</div><div class="line">                <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</div><div class="line">                    <span class="keyword">try</span> &#123;</div><div class="line">                        latch.await();</div><div class="line">                        simpleLimit.doRequest(<span class="string">"t-"</span> + finalI);</div><div class="line">                    &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;</div><div class="line">                        e.printStackTrace();</div><div class="line">                    &#125;</div><div class="line">                &#125;</div><div class="line">            &#125;);</div><div class="line">            t.start();</div><div class="line">        &#125;</div><div class="line">        latch.countDown();</div><div class="line">        System.in.read();</div><div class="line">    &#125;</div></pre></td></tr></table></figure></p>
+<p>结果<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/limit-result-1.png" alt="simple-limit结果"><br>可以看到，程序通过<code>requestCount</code>把并发数量控制在10，当有50个线程并发去访问时，就会出现有得线程能竞争资源成功，有的线程竞争资源失败<br>这种并发控制方式比较简单粗暴，没有平滑处理，应用的时候要根据场景使用</p>
+<h2 id="针对时间窗口进行并发控制"><a href="#针对时间窗口进行并发控制" class="headerlink" title="针对时间窗口进行并发控制"></a>针对时间窗口进行并发控制</h2><p>限制住一个窗口时间内接口的请求量，例如某个基础服务调用量很大，怕被突然的大流量打挂，下面是一种实现窗口时间并发控制的方法<br>我们使用Guava的Cache来存储计数器，利用秒数作为Key，Value代表这一秒有多少个请求，这样就限制了一秒内的并发数。另外过期时间设置为两秒，保证一秒内的数据是存在的。<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">TimeLimit</span> </span>&#123;</div><div class="line"></div><div class="line">    <span class="keyword">private</span> <span class="keyword">long</span> limit = <span class="number">5</span>; <span class="comment">//限流数</span></div><div class="line"></div><div class="line">    <span class="keyword">static</span> <span class="keyword">volatile</span> <span class="keyword">boolean</span> exit;</div><div class="line"></div><div class="line">    <span class="keyword">private</span> LoadingCache&lt;Long, AtomicLong&gt; counter =</div><div class="line">            CacheBuilder.newBuilder()</div><div class="line">                    .expireAfterWrite(<span class="number">2</span>, TimeUnit.SECONDS)</div><div class="line">                    .build(<span class="keyword">new</span> CacheLoader&lt;Long, AtomicLong&gt;() &#123;</div><div class="line">                        <span class="meta">@Override</span></div><div class="line">                        <span class="function"><span class="keyword">public</span> AtomicLong <span class="title">load</span><span class="params">(Long aLong)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">                            <span class="keyword">return</span> <span class="keyword">new</span> AtomicLong(<span class="number">0</span>);</div><div class="line">                        &#125;</div><div class="line">                    &#125;);</div><div class="line"></div><div class="line"></div><div class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">doRequest</span><span class="params">(String threadName)</span> <span class="keyword">throws</span> ExecutionException </span>&#123;</div><div class="line">        <span class="keyword">long</span> currentSecond = System.currentTimeMillis() / <span class="number">1000</span>;</div><div class="line">        <span class="keyword">if</span> (counter.get(currentSecond).incrementAndGet() &gt; limit) &#123;</div><div class="line">            System.out.println(threadName + <span class="string">":请求过多，请稍后再尝试"</span>);</div><div class="line">        &#125; <span class="keyword">else</span> &#123;</div><div class="line">            System.out.println(threadName + <span class="string">":您的请求已受理"</span>);</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line">    ......</div><div class="line"> &#125;</div></pre></td></tr></table></figure></p>
+<p>测试代码<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> InterruptedException </span>&#123;</div><div class="line">        <span class="comment">//或等当前秒数</span></div><div class="line"></div><div class="line">        <span class="keyword">final</span> TimeLimit timeLimit = <span class="keyword">new</span> TimeLimit();</div><div class="line">        <span class="keyword">final</span> CountDownLatch latch = <span class="keyword">new</span> CountDownLatch(<span class="number">1</span>);</div><div class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10</span>; i++) &#123;</div><div class="line">            <span class="keyword">final</span> <span class="keyword">int</span> finalI = i;</div><div class="line">            Thread t = <span class="keyword">new</span> Thread(<span class="keyword">new</span> Runnable() &#123;</div><div class="line">                <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</div><div class="line">                    <span class="keyword">try</span> &#123;</div><div class="line">                        latch.await();</div><div class="line">                        <span class="keyword">while</span> (!exit) &#123;</div><div class="line">                            timeLimit.doRequest(<span class="string">"t-"</span> + finalI);</div><div class="line">                            Thread.sleep(<span class="number">1000</span>);</div><div class="line">                        &#125;</div><div class="line">                    &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;</div><div class="line">                        e.printStackTrace();</div><div class="line">                    &#125; <span class="keyword">catch</span> (ExecutionException e) &#123;</div><div class="line">                        e.printStackTrace();</div><div class="line">                    &#125;</div><div class="line">                &#125;</div><div class="line">            &#125;);</div><div class="line">            t.start();</div><div class="line">        &#125;</div><div class="line">        latch.countDown();</div><div class="line">        Thread.sleep(<span class="number">3000</span>);</div><div class="line">        exit = <span class="keyword">true</span>;</div><div class="line">    &#125;</div></pre></td></tr></table></figure></p>
+<p>结果<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/limit-result-2.png" alt="simple-limit2结果"><br>限流数为5，并发数为10，从结果上看，当一秒内请求数到了5之后，接下来的请求都会别拒绝</p>
+<h2 id="平滑限流接口请求数"><a href="#平滑限流接口请求数" class="headerlink" title="平滑限流接口请求数"></a>平滑限流接口请求数</h2><p>之前的限流方式都不能很好地应对突发请求，即瞬间请求可能都被允许从而导致一些问题；因此在一些场景中需要对突发请求进行整形，整形为平均速率请求处理（比如5r/s，则每隔200毫秒处理一个请求，平滑了速率）。<br>这个时候有两种算法满足我们的场景：令牌桶和漏桶算法。Guava框架提供了令牌桶算法实现，可直接拿来使用。</p>
+<h3 id="基本使用-1"><a href="#基本使用-1" class="headerlink" title="基本使用-1"></a>基本使用-1</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">BasicUsage</span> </span>&#123;</div><div class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</div><div class="line">        RateLimiter rateLimiter = RateLimiter.create(<span class="number">5</span>); <span class="comment">//令牌桶容量为5，即每200毫秒产生1个令牌</span></div><div class="line">        System.out.println(rateLimiter.acquire()); <span class="comment">//阻塞获取一个令牌</span></div><div class="line">        System.out.println(rateLimiter.acquire());</div><div class="line">        System.out.println(rateLimiter.acquire());</div><div class="line">        System.out.println(rateLimiter.acquire());</div><div class="line">        System.out.println(rateLimiter.acquire());</div><div class="line">        System.out.println(rateLimiter.acquire());</div><div class="line">    &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>结果<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="number">0.0</span> <span class="comment">//马上得到令牌，所以等待时间为0</span></div><div class="line"><span class="number">0.166525</span> <span class="comment">//因为令牌桶每200毫秒产生1个令牌，所以上面消耗掉令牌后桶里没令牌，需要等待新的令牌产生后才能消费，下面的同理</span></div><div class="line"><span class="number">0.167868</span>    </div><div class="line"><span class="number">0.195596</span></div><div class="line"><span class="number">0.193168</span></div><div class="line"><span class="number">0.128312</span></div></pre></td></tr></table></figure></p>
+<p>如果令牌桶里有令牌的话，acquire返回0。如果没令牌，则等待一段时间，当有令牌的时候消费令牌并则返回等待令牌所消耗的时间。</p>
+<h3 id="基本使用-2"><a href="#基本使用-2" class="headerlink" title="基本使用-2"></a>基本使用-2</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">BasicUsage</span> </span>&#123;</div><div class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</div><div class="line">        RateLimiter rateLimiter = RateLimiter.create(<span class="number">5</span>); <span class="comment">//令牌桶容量为5，即每200毫秒产生1个令牌</span></div><div class="line">        System.out.println(rateLimiter.acquire(<span class="number">10</span>)); <span class="comment">//透支令牌</span></div><div class="line">        System.out.println(rateLimiter.acquire());</div><div class="line">        System.out.println(rateLimiter.acquire());</div><div class="line">        System.out.println(rateLimiter.acquire());</div><div class="line">        System.out.println(rateLimiter.acquire());</div><div class="line">        System.out.println(rateLimiter.acquire());</div><div class="line">    &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>结果<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="number">0.0</span></div><div class="line"><span class="number">1.996642</span></div><div class="line"><span class="number">0.197655</span></div><div class="line"><span class="number">0.19933</span></div><div class="line"><span class="number">0.200378</span></div><div class="line"><span class="number">0.200474</span></div></pre></td></tr></table></figure></p>
+<p>令牌桶允许一定程度的透支，不过接下来的请求需要等透支完的补充回来后才能继续执行。</p>
+<h3 id="基本使用-3"><a href="#基本使用-3" class="headerlink" title="基本使用-3"></a>基本使用-3</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">BasicUsage</span> </span>&#123;</div><div class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> InterruptedException </span>&#123;</div><div class="line">        RateLimiter rateLimiter = RateLimiter.create(<span class="number">1000</span>); <span class="comment">//每秒投放1000个令牌</span></div><div class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10</span>; i++) &#123;</div><div class="line">            <span class="keyword">if</span> (rateLimiter.tryAcquire()) &#123; <span class="comment">//tryAcquire检测有没有可用的令牌，结果马上返回</span></div><div class="line">                System.out.println(<span class="string">"处理请求"</span>);</div><div class="line">            &#125; <span class="keyword">else</span> &#123;</div><div class="line">                System.out.println(<span class="string">"拒绝请求"</span>);</div><div class="line">            &#125;</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>结果<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">处理请求</div><div class="line">处理请求</div><div class="line">处理请求</div><div class="line">拒绝请求</div><div class="line">拒绝请求</div><div class="line">拒绝请求</div><div class="line">拒绝请求</div><div class="line">拒绝请求</div><div class="line">拒绝请求</div><div class="line">拒绝请求</div></pre></td></tr></table></figure></p>
+<p>没有获取到令牌的请求将会被拒绝，这里可以添加一些额外的处理，例如增加异步操作，把处理不过来的请求加入队列，待处理完之后发消息通知用户处理结果。</p>
+<h3 id="模拟请求"><a href="#模拟请求" class="headerlink" title="模拟请求"></a>模拟请求</h3><p>模拟一个TPS为10的接口<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">MockUsage</span> </span>&#123;</div><div class="line"></div><div class="line">    RateLimiter rateLimiter = RateLimiter.create(<span class="number">10</span>); <span class="comment">//TPS为10</span></div><div class="line"></div><div class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">doRequest</span><span class="params">(String threadName)</span> </span>&#123;</div><div class="line">        <span class="keyword">boolean</span> isAcquired = rateLimiter.tryAcquire();</div><div class="line">        <span class="keyword">if</span> (isAcquired) &#123;</div><div class="line">            System.out.println(threadName + <span class="string">":下单成功"</span>);</div><div class="line">        &#125; <span class="keyword">else</span> &#123;</div><div class="line">            System.out.println(threadName + <span class="string">":当前下单人数过多，请稍后再试"</span>);</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line">    ...... </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>测试<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> InterruptedException, IOException </span>&#123;</div><div class="line">        <span class="keyword">final</span> MockUsage mockUsage = <span class="keyword">new</span> MockUsage();</div><div class="line">        <span class="keyword">final</span> CountDownLatch latch = <span class="keyword">new</span> CountDownLatch(<span class="number">1</span>);<span class="comment">//两个工人的协作</span></div><div class="line">        <span class="keyword">final</span> Random random = <span class="keyword">new</span> Random(<span class="number">10</span>);</div><div class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">20</span>; i++) &#123; <span class="comment">//模拟一秒内20个并发</span></div><div class="line">            <span class="keyword">final</span> <span class="keyword">int</span> finalI = i;</div><div class="line">            Thread t = <span class="keyword">new</span> Thread(<span class="keyword">new</span> Runnable() &#123;</div><div class="line">                <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</div><div class="line">                    <span class="keyword">try</span> &#123;</div><div class="line">                        latch.await();</div><div class="line">                        <span class="keyword">int</span> sleepTime = random.nextInt(<span class="number">1000</span>); <span class="comment">//随机sleep [0,1000)毫秒</span></div><div class="line">                        Thread.sleep(sleepTime);</div><div class="line">                        mockUsage.doRequest(<span class="string">"t-"</span> + finalI);</div><div class="line">                    &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;</div><div class="line">                        e.printStackTrace();</div><div class="line">                    &#125;</div><div class="line">                &#125;</div><div class="line">            &#125;);</div><div class="line">            t.start();</div><div class="line">        &#125;</div><div class="line">        latch.countDown();</div><div class="line">        System.in.read();</div><div class="line">    &#125;</div></pre></td></tr></table></figure></p>
+<p>结果<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line">t-<span class="number">8</span>:下单成功</div><div class="line">t-<span class="number">2</span>:下单成功</div><div class="line">t-<span class="number">10</span>:下单成功</div><div class="line">t-<span class="number">11</span>:当前下单人数过多，请稍后再试</div><div class="line">t-<span class="number">1</span>:当前下单人数过多，请稍后再试</div><div class="line">t-<span class="number">3</span>:当前下单人数过多，请稍后再试</div><div class="line">t-<span class="number">17</span>:当前下单人数过多，请稍后再试</div><div class="line">t-<span class="number">6</span>:当前下单人数过多，请稍后再试</div><div class="line">t-<span class="number">5</span>:下单成功</div><div class="line">t-<span class="number">0</span>:当前下单人数过多，请稍后再试</div><div class="line">t-<span class="number">19</span>:当前下单人数过多，请稍后再试</div><div class="line">t-<span class="number">4</span>:下单成功</div><div class="line">t-<span class="number">16</span>:当前下单人数过多，请稍后再试</div><div class="line">t-<span class="number">18</span>:当前下单人数过多，请稍后再试</div><div class="line">t-<span class="number">9</span>:下单成功</div><div class="line">t-<span class="number">13</span>:下单成功</div><div class="line">t-<span class="number">14</span>:下单成功</div><div class="line">t-<span class="number">12</span>:下单成功</div><div class="line">t-<span class="number">15</span>:下单成功</div><div class="line">t-<span class="number">7</span>:当前下单人数过多，请稍后再试</div></pre></td></tr></table></figure></p>
+<p>上面模拟了一个TPS为10的接口，同时一秒内20个并发请求，观察发现一半的请求下单成功，而另一半的需要稍后再试，符合我们的预期</p>
+<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><p>上面的是应用层的限流策略，有基于Atomic的请求数限流，有基于GuavaCache的针对时间窗口请求数限流，也有基于令牌桶的平滑限流。Atomic和GuavaCache这两种方法比较粗粒度，简单的场景下可以使用。<br>令牌桶的方法比较细粒度，使用上更灵活，适合复杂一点的场景。<br>不过以上的方式只是对单应用进行了限流，在分布式和流行的微服务的场景下有心无力，接下来将会继续学习在分布式和微服务的场景下如何限流。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><ul>
+<li><a href="http://www.tuicool.com/articles/iQFfaqf" target="_blank" rel="external">过载保护算法浅析-http://www.tuicool.com/articles/iQFfaqf</a></li>
+<li><a href="http://www.w2bc.com/Article/10235" target="_blank" rel="external">使用guava来做接口限流-http://www.w2bc.com/Article/10235</a></li>
+</ul>
+<p>欢迎关注个人公众号<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/wechat.png" alt="Ray乐园"></p>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2016/06/23/rate-limit2/">系统限流实践 - 应用限流</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Ray</a></p>
+        <p><span>发布时间:</span>2016-06-23, 17:11:48</p>
+        <p><span>最后更新:</span>2016-12-23, 15:45:41</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2016/06/23/rate-limit2/" title="系统限流实践 - 应用限流">http://lzw2006.github.io/2016/06/23/rate-limit2/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://lzw2006.github.io/2016/06/23/rate-limit2/　　作者: Ray" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target = "_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2016/06/30/rate-limit3/">
+                    系统限流实践 - 分布式限流
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2016/06/23/rate-limit/">
+                    系统限流实践 - 理论篇
+                </a>
+            </div>
+        
+    </nav>
+
+
+<!-- 打赏代码 -->
+<div class="post-donate">
+    <div id="donate_board" class="donate_bar center">
+        <a id="btn_donate" class="btn_donate" href="javascript:;" title="Donate 打赏" target="_blank"></a>
+        <span class="donate_txt">
+           ↑<br>
+
+            欣赏此文？赏份狗粮！
+
+        </span>
+        <br>
+    </div>
+
+    <div id="donate_guide" class="donate_bar center hidden">
+
+        <a href="http://7xsmef.com1.z0.glb.clouddn.com/ali_pay.png" title="支付宝打赏" class="fancybox" rel="article0" style="float:left;margin-left:25%;margin-right:2px;" target="_blank">
+            <img src="http://7xsmef.com1.z0.glb.clouddn.com/ali_pay.png" title="支付宝打赏" height="164px" width="164px">
+        </a>
+
+
+
+        <a href="http://7xsmef.com1.z0.glb.clouddn.com/wechat_pay.JPG" title="微信打赏" class="fancybox" rel="article0" target="_blank">
+            <img src="http://7xsmef.com1.z0.glb.clouddn.com/wechat_pay.JPG" title="微信打赏" height="164px" width="164px">
+        </a>
+
+
+    </div>
+
+    <script type="text/javascript">
+        document.getElementById('btn_donate').onclick = function(){
+            $('#donate_board').addClass('hidden');
+            $('#donate_guide').removeClass('hidden');
+        }
+    </script>
+</div>
+<!-- 打赏代码END -->
+  
+</article>
+
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#目录"><span class="toc-number">1.</span> <span class="toc-text">目录</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#开篇"><span class="toc-number">2.</span> <span class="toc-text">开篇</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#应用级限流"><span class="toc-number">3.</span> <span class="toc-text">应用级限流</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#针对容器限制总并发-连接-请求数"><span class="toc-number">3.1.</span> <span class="toc-text">针对容器限制总并发/连接/请求数</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#针对接口进行并发控制"><span class="toc-number">3.2.</span> <span class="toc-text">针对接口进行并发控制</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#针对时间窗口进行并发控制"><span class="toc-number">3.3.</span> <span class="toc-text">针对时间窗口进行并发控制</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#平滑限流接口请求数"><span class="toc-number">3.4.</span> <span class="toc-text">平滑限流接口请求数</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#基本使用-1"><span class="toc-number">3.4.1.</span> <span class="toc-text">基本使用-1</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#基本使用-2"><span class="toc-number">3.4.2.</span> <span class="toc-text">基本使用-2</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#基本使用-3"><span class="toc-number">3.4.3.</span> <span class="toc-text">基本使用-3</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#模拟请求"><span class="toc-number">3.4.4.</span> <span class="toc-text">模拟请求</span></a></li></ol></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#总结"><span class="toc-number">4.</span> <span class="toc-text">总结</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#参考资料"><span class="toc-number">5.</span> <span class="toc-text">参考资料</span></a></li></ol>
+</div>
+<style>
+    .left-col .switch-btn,
+    .left-col .switch-area {
+        display: none;
+    }
+</style>
+
+<input type="button" id="tocButton" value="隐藏目录"  title="点击按钮隐藏或者显示文章目录">
+
+<script>
+    yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+</script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></i></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":"系统限流实践 - 应用限流　| Ray的博客　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+      <div class="duoshuo" id="comments">
+    <div id="comment-box" ></div>
+    <div class="ds-thread" data-thread-key="2016/06/23/rate-limit2/" data-title="系统限流实践 - 应用限流" data-url="http://lzw2006.github.io/2016/06/23/rate-limit2/"></div>
+    <script>
+        var duoshuoQuery = {short_name:"rayleung"};
+        var loadComment = function(){
+            var d = document, s = d.createElement('script');
+            s.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+            s.async = true; s.charset = 'UTF-8';
+            (d.head || d.body).appendChild(s);
+        }
+
+        
+    </script>
+    
+    <script> loadComment(); </script>
+
+</div>
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2016/06/30/rate-limit3/" title="上一篇: 系统限流实践 - 分布式限流">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2016/06/23/rate-limit/" title="下一篇: 系统限流实践 - 理论篇">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2017/03/01/thread/">ThreadLocal - 是怎样炼成的</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/12/23/mybatis-1/">Mybatis - 各种方式配置</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/09/20/spring-netfix-register/">Spring Cloud服务发现</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/09/14/spring-config/">Spring Config学习</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/17/codis/">利用Docker安装运行Codis</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/13/jvm-classfile/">我的JVM之旅-ClassFile</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/12/rate-limit5/">系统限流实践 - 接入层限流(下*完结)</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/07/elk/">用ELK搭建简单的日志收集分析系统</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/06/rate-limit4/">系统限流实践 - 接入层限流(上)</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/30/rate-limit3/">系统限流实践 - 分布式限流</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/23/rate-limit2/">系统限流实践 - 应用限流</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/23/rate-limit/">系统限流实践 - 理论篇</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/20/create-hexo-github-site/">利用hexo和github搭建自己的免费博客</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/16/my-new-blog/">终于开通私人博客啦！</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2016-2017 Ray
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.0">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style='display:none'>
+                        <span id="site-visit" >本站到访数: 
+                            <span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>, </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style='display:none'>
+                        <span id="page-visit">本页阅读量: 
+                            <span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 10;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

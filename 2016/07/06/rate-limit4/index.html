@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no" />
+<meta name="author" content="Ray" />
+
+
+
+<meta name="description" content="本文是根据开涛的博客 聊聊高并发系统之限流特技-2 整理而成，自学笔记第一篇
+
+目录1.系统限流实践 - 理论篇2.系统限流实践 - 应用限流3.系统限流实践 - 分布式限流4.系统限流实践 - 接入层限流(上)5.系统限流实践 - 接入层限流(下*完结)
+开篇上篇学习了分布式限流(传送门)，接下来学习一下接入层限流的方法
+对于简单的web应用，我们一般直接通过容器例如Tomcat/Jetty直">
+<meta property="og:type" content="article">
+<meta property="og:title" content="系统限流实践 - 接入层限流(上)">
+<meta property="og:url" content="http://lzw2006.github.io/2016/07/06/rate-limit4/index.html">
+<meta property="og:site_name" content="Ray的博客">
+<meta property="og:description" content="本文是根据开涛的博客 聊聊高并发系统之限流特技-2 整理而成，自学笔记第一篇
+
+目录1.系统限流实践 - 理论篇2.系统限流实践 - 应用限流3.系统限流实践 - 分布式限流4.系统限流实践 - 接入层限流(上)5.系统限流实践 - 接入层限流(下*完结)
+开篇上篇学习了分布式限流(传送门)，接下来学习一下接入层限流的方法
+对于简单的web应用，我们一般直接通过容器例如Tomcat/Jetty直">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/wechat.png">
+<meta property="og:updated_time" content="2016-12-23T07:45:41.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="系统限流实践 - 接入层限流(上)">
+<meta name="twitter:description" content="本文是根据开涛的博客 聊聊高并发系统之限流特技-2 整理而成，自学笔记第一篇
+
+目录1.系统限流实践 - 理论篇2.系统限流实践 - 应用限流3.系统限流实践 - 分布式限流4.系统限流实践 - 接入层限流(上)5.系统限流实践 - 接入层限流(下*完结)
+开篇上篇学习了分布式限流(传送门)，接下来学习一下接入层限流的方法
+对于简单的web应用，我们一般直接通过容器例如Tomcat/Jetty直">
+<meta name="twitter:image" content="http://7xsmef.com1.z0.glb.clouddn.com/wechat.png">
+
+<link rel="apple-touch-icon" href= "/apple-touch-icon.png">
+
+
+    <link rel="alternative" href="/atom.xml" title="Ray的博客" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title>系统限流实践 - 接入层限流(上) | Ray的博客</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        open_in_new: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: undefined
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Ray</a></h1>
+        </hgroup>
+
+        
+        <p class="header-subtitle">Java攻城狮|经济小学徒|模型小爱好</p>
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">所有文章</a></li>
+                        
+                            <li><a href="/tags/">标签云</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:rayleung_xyz@126.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                                <a class="fa RSS" target="_blank" href="/atom.xml" title="RSS"></a>
+                            
+                                <a class="fa CSDN" target="_blank" href="http://blog.csdn.net/lzw_2006" title="CSDN"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/JAVA/">JAVA</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/">JVM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mybatis/">Mybatis</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/ORM/">ORM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/">Thread</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/spring/">spring</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/spring-cloud/">spring-cloud</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/中间件/">中间件</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/其他/">其他</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/基础设施/">基础设施</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/念念碎/">念念碎</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/技术/">技术</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/日志归集/">日志归集</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/架构/">架构</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/系统限流/">系统限流</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a target="_blank" class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                      <a target="_blank" class="main-nav-link switch-friends-link" href="http://lixuanbin.github.io/">秦沙</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">喜欢IT技术，喜欢经济，喜欢模型</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Ray</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Ray</a></h1>
+            </hgroup>
+            
+            <p class="header-subtitle">Java攻城狮|经济小学徒|模型小爱好</p>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">所有文章</a></li>
+                
+                    <li><a href="/tags/">标签云</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:rayleung_xyz@126.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                                <a class="fa RSS" target="_blank" href="/atom.xml" title="RSS"></a>
+                            
+                                <a class="fa CSDN" target="_blank" href="http://blog.csdn.net/lzw_2006" title="CSDN"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我"/>
+</nav>
+      <div class="body-wrap"><article id="post-rate-limit4" class="article article-type-post" itemscope itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2016/07/06/rate-limit4/" class="article-date">
+      <time datetime="2016-07-06T01:34:51.000Z" itemprop="datePublished">2016-07-06</time>
+</a>
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy" />
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      系统限流实践 - 接入层限流(上)
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/技术/">技术</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/架构/">架构</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/系统限流/">系统限流</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <blockquote>
+<p>本文是根据开涛的博客 <a href="http://mp.weixin.qq.com/s?__biz=MzIwODA4NjMwNA==&amp;mid=2652897782&amp;idx=1&amp;sn=cb46b23b2778f14ea3bcc419eb0392ce&amp;scene=1&amp;srcid=0614L7nA5Lma1B73nwTPgerj#rd" target="_blank" rel="external">聊聊高并发系统之限流特技-2</a> 整理而成，自学笔记第一篇</p>
+</blockquote>
+<h1 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h1><p>1.<a href="http://rayleung.xyz/2016/06/23/rate-limit/" target="_blank" rel="external">系统限流实践 - 理论篇</a><br>2.<a href="http://rayleung.xyz/2016/06/23/rate-limit2/" target="_blank" rel="external">系统限流实践 - 应用限流</a><br>3.<a href="http://rayleung.xyz/2016/06/30/rate-limit3/" target="_blank" rel="external">系统限流实践 - 分布式限流</a><br>4.<a href="http://rayleung.xyz/2016/07/06/rate-limit4/" target="_blank" rel="external">系统限流实践 - 接入层限流(上)</a><br>5.<a href="http://rayleung.xyz/2016/07/12/rate-limit5/" target="_blank" rel="external">系统限流实践 - 接入层限流(下*完结)</a></p>
+<h1 id="开篇"><a href="#开篇" class="headerlink" title="开篇"></a>开篇</h1><p>上篇学习了分布式限流(<a href="http://rayleung.xyz/2016/06/30/rate-limit3/" target="_blank" rel="external">传送门</a>)，接下来学习一下接入层限流的方法</p>
+<p>对于简单的web应用，我们一般直接通过容器例如Tomcat/Jetty直接把应用暴露给外部使用，这样做简单方便快速。<br>但是对以下的场景就有点有心无力或者实现成本比较大，例如安全校验、负载均衡、请求聚合、服务降级、限流、A/B测试、服务质量监控等等。<br>因此一般可以抽象出一个层次——-接入层，来实现以上场景。曾经在某外资银行工作做过，当时他们的系统也有接入层，叫”GateWay”层，实现了用户的身份校验，应用的Token验证以及服务路由等功能，用的是Java工程来实现的。<br>不过个人觉得用Java来实现接入层有几个缺点：</p>
+<ul>
+<li><strong>实现复杂</strong><br>例如写一个路由功能需要自己实现路径配置、路径解析等工作，目前已经有web服务器（Nginx）能够实现基于正则表达式的路由功能，配合Lua脚本的话，能做的东西就更多更灵活了</li>
+<li><strong>配置更新不灵活</strong><br>Java项目要做到动态配置，可以通过Zookeeper或者Redis来做配置中心，因此要一系列的基础设施做配合，才能使得更新配置不用重启Java应用。要知道重启Java应用成本是一件成本比较高的事情。<br>而通过Nginx的 -s reload 命令，能够很优雅地重启Nginx而不会对现有的连接造成影响，用户感知不到Nginx曾经重启过。<br>如果想通过UI界面来更新路由而不重启Nginx，还可以使用<a href="https://github.com/weibocom/nginx-upsync-module" target="_blank" rel="external">nginx-upsync-module</a>模块配合Consul和Consul Web UI来实现</li>
+</ul>
+<a id="more"></a>
+<p>说了那么多，下面进入正题</p>
+<h1 id="接入层限流"><a href="#接入层限流" class="headerlink" title="接入层限流"></a>接入层限流</h1><p>对于Nginx接入层限流可以使用Nginx自带的两个模块：连接数限流模块<strong>ngx_http_limit_conn_module</strong>和漏桶算法实现的请求限流模块<strong>ngx_http_limit_req_module</strong>。<br>还可以使用OpenResty提供的Lua限流模块<strong>lua-resty-limit-traffic</strong>进行更复杂的限流场景。</p>
+<h2 id="ngx-http-limit-conn-module"><a href="#ngx-http-limit-conn-module" class="headerlink" title="ngx_http_limit_conn_module"></a>ngx_http_limit_conn_module</h2><blockquote>
+<p>limit_conn对某个KEY对应的总的网络连接数进行限流。可以按照IP来限制IP维度的总连接数，或者按照服务域名来限制某个域名的总连接数。但是不是每一个请求连接都会被计数器统计，只有那些被Nginx处理的且已经读取了整个请求头的请求连接才会被计数器统计。<br><a href="http://nginx.org/en/docs/http/ngx_http_limit_conn_module.html" target="_blank" rel="external">参考链接-http://nginx.org/en/docs/http/ngx_http_limit_conn_module.html</a></p>
+</blockquote>
+<h3 id="配置示例"><a href="#配置示例" class="headerlink" title="配置示例"></a>配置示例</h3><figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line">http &#123;</div><div class="line">    limit_conn_zone $binary_remote_addr zone=addr:10m;</div><div class="line">    limit_conn_log_level error;</div><div class="line">    limit_conn_status 503;</div><div class="line">    ...</div><div class="line"></div><div class="line">    server &#123;</div><div class="line"></div><div class="line">        ...</div><div class="line"></div><div class="line">        location /download/ &#123;</div><div class="line">            limit_conn addr 1;</div><div class="line">        &#125;</div></pre></td></tr></table></figure>
+<p><strong>limit_conn_zone</strong><br> 命令格式:<code>limit_conn_zone key zone=name:size;</code><br> 说明:设置一个共享内存区域给<code>key</code>,这个区域里面保存<code>key</code>的状态，进一步来说就是保存当前链接数的数量，<code>$binary_remote_addr</code>其表示IP地址，也可以使用如<code>$server_name</code>作为KEY来限制域名级别的最大连接数。</p>
+<p><strong>limit_conn_log_level</strong><br> 配置记录被限流后的日志级别，默认error级别。</p>
+<p><strong>limit_conn_status</strong><br> 配置被限流后返回的状态码，默认返回503。</p>
+<p><strong>limit_conn</strong><br> 配置共享区域里面key(这里的key是<code>addr</code>)的最大链接数。此处指定的最大连接数是1，表示Nginx最多同时并发处理1个连接。</p>
+<h3 id="limit-conn的主要执行过程"><a href="#limit-conn的主要执行过程" class="headerlink" title="limit_conn的主要执行过程"></a>limit_conn的主要执行过程</h3><p> 1.请求进入首先判断当前limit_conn_zone中相应的key的连接数是否超出了配置的最大链接数<br> 2.如果超出了，则被限流，返回limit_conn_status定义的错误码;否则相应的key链接数加1，并注册请求处理完成的回调函数<br> 3.进行请求处理<br> 4.结束请求阶段会调用注册的回调函数对相应的链接数减1</p>
+<h3 id="按照IP限制并发连接数"><a href="#按照IP限制并发连接数" class="headerlink" title="按照IP限制并发连接数"></a>按照IP限制并发连接数</h3><p> 首先定义根据IP维度的限流区域<br> <figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">http &#123;</div><div class="line">   ......</div><div class="line">   limit_conn_zone $binary_remote_addr zone=addr:10m;</div><div class="line">   limit_conn_log_level error;</div><div class="line">   limit_conn_status 503;</div><div class="line">   ......</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p> 然后定义限流接口<br> <figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line">http &#123;</div><div class="line">   ......</div><div class="line">   limit_conn_zone $binary_remote_addr zone=addr:10m;</div><div class="line">   limit_conn_log_level error;</div><div class="line">   limit_conn_status 503;</div><div class="line">   ......</div><div class="line">   server &#123;</div><div class="line">      ......</div><div class="line">      location /limit &#123;</div><div class="line">          limit_conn addr 2; #限流2</div><div class="line">          echo "success";</div><div class="line">      &#125;</div><div class="line">      ......</div><div class="line">   &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>用ab工具进行测试，并发数为5，总请求数为5<br><code>ab -n 5 -c 5 http://localhost:8080/limit</code></p>
+<p>得到以下结果，限流成功<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">************ - - [07/Jul/2016:11:06:28 +0800] &quot;GET /limit HTTP/1.0&quot; 200 8 &quot;-&quot; &quot;ApacheBench/2.3&quot;</div><div class="line">************ - - [07/Jul/2016:11:06:28 +0800] &quot;GET /limit HTTP/1.0&quot; 200 8 &quot;-&quot; &quot;ApacheBench/2.3&quot;</div><div class="line">************ - - [07/Jul/2016:11:06:28 +0800] &quot;GET /limit HTTP/1.0&quot; 503 537 &quot;-&quot; &quot;ApacheBench/2.3&quot;</div><div class="line">************ - - [07/Jul/2016:11:06:28 +0800] &quot;GET /limit HTTP/1.0&quot; 503 537 &quot;-&quot; &quot;ApacheBench/2.3&quot;</div><div class="line">************ - - [07/Jul/2016:11:06:28 +0800] &quot;GET /limit HTTP/1.0&quot; 503 537 &quot;-&quot; &quot;ApacheBench/2.3&quot;</div></pre></td></tr></table></figure></p>
+<h3 id="按照域名限流"><a href="#按照域名限流" class="headerlink" title="按照域名限流"></a>按照域名限流</h3><p> 跟上节基本相同，区别在于维度不一样了,key字段改为了<code>$server_name</code><br> <code>limit_conn_zone $server_name zone = perserver:10m;</code></p>
+<h2 id="ngx-http-limit-req-module"><a href="#ngx-http-limit-req-module" class="headerlink" title="ngx_http_limit_req_module"></a>ngx_http_limit_req_module</h2><blockquote>
+<p>limit_req是根据请求速率来做限流，是令牌桶算法的实现<br> <a href="http://nginx.org/en/docs/http/ngx_http_limit_req_module.html" target="_blank" rel="external">参考链接-http://nginx.org/en/docs/http/ngx_http_limit_req_module.html</a></p>
+</blockquote>
+<h3 id="配置示例-1"><a href="#配置示例-1" class="headerlink" title="配置示例"></a>配置示例</h3> <figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line">http &#123;</div><div class="line">    limit_req_zone $binary_remote_addr zone=one:10m rate=1r/s;</div><div class="line"></div><div class="line">    ...</div><div class="line"></div><div class="line">    server &#123;</div><div class="line"></div><div class="line">        ...</div><div class="line"></div><div class="line">        location /search/ &#123;</div><div class="line">            limit_req zone=one burst=5;</div><div class="line">        &#125;</div></pre></td></tr></table></figure>
+<p> <strong>limit_req</strong><br> 配置限流区域、桶容量（突发容量，默认0）、是否延迟模式（默认延迟）<br> <strong>limit_req_zone</strong><br> 配置限流KEY、及存放KEY对应信息的共享内存区域大小、固定请求速率；此处指定的KEY是“$binary_remote_addr”表示IP地址；固定请求速率使用rate参数配置，支持10r/s和60r/m，即每秒10个请求和每分钟60个请求，不过最终都会转换为每秒的固定请求速率（10r/s为每100毫秒处理一个请求；60r/m，即每1000毫秒处理一个请求）<br> <strong>limit_req_status</strong><br> 配置被限流后返回的状态码，默认返回503<br> <strong>limit_req_log_level</strong><br> 配置记录被限流后的日志级别，默认error级别</p>
+<h3 id="limit-req的主要执行过程"><a href="#limit-req的主要执行过程" class="headerlink" title="limit_req的主要执行过程"></a>limit_req的主要执行过程</h3><p> 1 请求进入后首先判断最后一次请求时间相对于当前时间（第一次是0）是否需要限流，如果需要限流则执行步骤2，否则执行步骤3<br> 2.1 如果没有配置桶容量（burst），则桶容量为0；按照固定速率处理请求；如果请求被限流，则直接返回相应的错误码（默认503）<br> 2.2 如果配置了桶容量（burst&gt;0）且延迟模式(没有配置nodelay)；如果桶满了，则新进入的请求被限流；如果没有满则请求会以固定平均速率被处理（按照固定速率并根据需要延迟处理请求，延迟使用休眠实现）<br> 2.3（burst&gt;0）且非延迟模式（配置了nodelay）；不会按照固定速率处理请求，而是允许突发处理请求；如果桶满了，则请求被限流，直接返回相应的错误码；后面令牌将会按章速率重新补充回桶里面<br> 3 如果没有被限流，则正常处理请求<br> 4 Nginx会在相应实际选择一些限流Key进行过期处理，进行内存回收</p>
+<h3 id="固定请求速率为1r-s，bustr为0"><a href="#固定请求速率为1r-s，bustr为0" class="headerlink" title="固定请求速率为1r/s，bustr为0"></a>固定请求速率为1r/s，bustr为0</h3><p> 维度设置<br> <figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">http &#123;</div><div class="line">   ......</div><div class="line">   limit_req_zone $binary_remote_addr zone=test:10m rate=1r/s;</div><div class="line">   ......</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p> 限流逻辑<br> <figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line">http &#123;</div><div class="line">   ......</div><div class="line">   server &#123;</div><div class="line">       ......</div><div class="line">       location /limit &#123;</div><div class="line">           limit_req zone = test; #burst为0，且为delay模式</div><div class="line">           echo "success";</div><div class="line">       &#125;</div><div class="line">       ......</div><div class="line">   &#125;</div><div class="line">   ......</div><div class="line">   </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p> 这种配置下，当请求速率超过1r/s时，其余的请求将会被拒绝</p>
+<p> 测试<br> <code>ab -n 10 -c 1 http://192.168.235.190:8080/limit</code><br> <figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">10.50.101.69 - - [08/Jul/2016:14:09:17 +0800] &quot;GET /limit HTTP/1.0&quot; 200 8 &quot;-&quot; &quot;ApacheBench/2.3&quot;    --请求成功</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:09:17 +0800] &quot;GET /limit HTTP/1.0&quot; 503 537 &quot;-&quot; &quot;ApacheBench/2.3&quot;  --剩下的请求全部被限流</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:09:17 +0800] &quot;GET /limit HTTP/1.0&quot; 503 537 &quot;-&quot; &quot;ApacheBench/2.3&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:09:17 +0800] &quot;GET /limit HTTP/1.0&quot; 503 537 &quot;-&quot; &quot;ApacheBench/2.3&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:09:17 +0800] &quot;GET /limit HTTP/1.0&quot; 503 537 &quot;-&quot; &quot;ApacheBench/2.3&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:09:17 +0800] &quot;GET /limit HTTP/1.0&quot; 503 537 &quot;-&quot; &quot;ApacheBench/2.3&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:09:17 +0800] &quot;GET /limit HTTP/1.0&quot; 503 537 &quot;-&quot; &quot;ApacheBench/2.3&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:09:17 +0800] &quot;GET /limit HTTP/1.0&quot; 503 537 &quot;-&quot; &quot;ApacheBench/2.3&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:09:17 +0800] &quot;GET /limit HTTP/1.0&quot; 503 537 &quot;-&quot; &quot;ApacheBench/2.3&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:09:17 +0800] &quot;GET /limit HTTP/1.0&quot; 503 537 &quot;-&quot; &quot;ApacheBench/2.3&quot;</div></pre></td></tr></table></figure></p>
+<p> 因为固定请求速率为1r/s，所以第一个请求成功，而且由于没有配置burst，接下来的请求被限流了</p>
+<h3 id="固定请求速率为1r-s，burst为5"><a href="#固定请求速率为1r-s，burst为5" class="headerlink" title="固定请求速率为1r/s，burst为5"></a>固定请求速率为1r/s，burst为5</h3><p> 维度设置<br>  <figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">http &#123;</div><div class="line">   ......</div><div class="line">   limit_req_zone $binary_remote_addr zone=test:10m rate=1r/s;</div><div class="line">   ......</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>限流逻辑<br><figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line">http &#123;</div><div class="line">   ......</div><div class="line">   server &#123;</div><div class="line">       ......</div><div class="line">       location /limit &#123;</div><div class="line">           limit_req zone = test burst=5; #burst为0，且为delay模式</div><div class="line">           echo "success";</div><div class="line">       &#125;</div><div class="line">       ......</div><div class="line">   &#125;</div><div class="line">   ......</div><div class="line">   </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p> 这种配置下，当请求速率超过1r/s时，接下来的5个请求会放入burst，如果这时候再有请求到来将会被限流</p>
+<p> 由于不知道为什么在windows上用ab做测试呈现不了效果，于是通过写java代码来模拟<br> <figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">NginxLimit</span> </span>&#123;</div><div class="line"></div><div class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> IOException </span>&#123;</div><div class="line">        <span class="keyword">final</span> NginxLimit distrubuteLimit = <span class="keyword">new</span> NginxLimit();</div><div class="line">        <span class="keyword">final</span> CountDownLatch latch = <span class="keyword">new</span> CountDownLatch(<span class="number">1</span>);<span class="comment">//两个工人的协作</span></div><div class="line">        <span class="keyword">final</span> Random random = <span class="keyword">new</span> Random(<span class="number">10</span>);</div><div class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10</span>; i++) &#123;</div><div class="line">            <span class="keyword">final</span> <span class="keyword">int</span> finalI = i;</div><div class="line">            Thread t = <span class="keyword">new</span> Thread(<span class="keyword">new</span> Runnable() &#123;</div><div class="line">                <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</div><div class="line">                    <span class="keyword">try</span> &#123;</div><div class="line">                        latch.await();</div><div class="line">                            String rev = distrubuteLimit.sendGet(<span class="string">"http://192.168.235.190:8080/limit"</span>, <span class="keyword">null</span>);</div><div class="line">                            System.out.println(rev);</div><div class="line"></div><div class="line">                    &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;</div><div class="line">                        e.printStackTrace();</div><div class="line">                    &#125;</div><div class="line">                &#125;</div><div class="line">            &#125;);</div><div class="line">            t.start();</div><div class="line">        &#125;</div><div class="line">        latch.countDown();</div><div class="line">        System.in.read();</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> String <span class="title">sendGet</span><span class="params">(String url, String param)</span> </span>&#123;</div><div class="line">        String result = <span class="string">""</span>;</div><div class="line">        BufferedReader in = <span class="keyword">null</span>;</div><div class="line">        <span class="keyword">try</span> &#123;</div><div class="line">            String urlNameString = url + <span class="string">"?"</span> + param;</div><div class="line">            URL realUrl = <span class="keyword">new</span> URL(urlNameString);</div><div class="line">            <span class="comment">// 打开和URL之间的连接</span></div><div class="line">            URLConnection connection = realUrl.openConnection();</div><div class="line">            <span class="comment">// 设置通用的请求属性</span></div><div class="line">            connection.setRequestProperty(<span class="string">"accept"</span>, <span class="string">"*/*"</span>);</div><div class="line">            connection.setRequestProperty(<span class="string">"connection"</span>, <span class="string">"Keep-Alive"</span>);</div><div class="line">            connection.setRequestProperty(<span class="string">"user-agent"</span>,</div><div class="line">                    <span class="string">"Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)"</span>);</div><div class="line">            <span class="comment">// 建立实际的连接</span></div><div class="line">            connection.connect();</div><div class="line">            <span class="comment">// 定义 BufferedReader输入流来读取URL的响应</span></div><div class="line">            in = <span class="keyword">new</span> BufferedReader(<span class="keyword">new</span> InputStreamReader(</div><div class="line">                    connection.getInputStream()));</div><div class="line">            String line;</div><div class="line">            <span class="keyword">while</span> ((line = in.readLine()) != <span class="keyword">null</span>) &#123;</div><div class="line">                result += line;</div><div class="line">            &#125;</div><div class="line">        &#125; <span class="keyword">catch</span> (Exception e) &#123;</div><div class="line">            System.out.println(<span class="string">"发送GET请求出现异常"</span>);</div><div class="line">        &#125;</div><div class="line">        <span class="comment">// 使用finally块来关闭输入流</span></div><div class="line">        <span class="keyword">finally</span> &#123;</div><div class="line">            <span class="keyword">try</span> &#123;</div><div class="line">                <span class="keyword">if</span> (in != <span class="keyword">null</span>) &#123;</div><div class="line">                    in.close();</div><div class="line">                &#125;</div><div class="line">            &#125; <span class="keyword">catch</span> (Exception e2) &#123;</div><div class="line">                e2.printStackTrace();</div><div class="line">            &#125;</div><div class="line">        &#125;</div><div class="line">        <span class="keyword">return</span> result;</div><div class="line">    &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p> 测试结果<br> <figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">10.50.101.69 - - [08/Jul/2016:14:25:30 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:25:30 +0800] &quot;GET /limit?null HTTP/1.1&quot; 503 537 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:25:30 +0800] &quot;GET /limit?null HTTP/1.1&quot; 503 537 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:25:30 +0800] &quot;GET /limit?null HTTP/1.1&quot; 503 537 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:25:30 +0800] &quot;GET /limit?null HTTP/1.1&quot; 503 537 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:25:31 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:25:32 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:25:33 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:25:34 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:14:25:35 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div></pre></td></tr></table></figure></p>
+<p> 一共有10个请求，其中6个成功，4个失败。但是为什么有6个成功而不是5个呢？因为固定请求速率是1r/s，而burst容量是5，所以1+5得到6。剩下放不进burst的请求会别限流。另外通过日志观察，请求一秒处理一个。</p>
+<h3 id="固定请求速率为1r-s，burst为5，nodelay"><a href="#固定请求速率为1r-s，burst为5，nodelay" class="headerlink" title="固定请求速率为1r/s，burst为5，nodelay"></a>固定请求速率为1r/s，burst为5，nodelay</h3><p>维度设置<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">http &#123;</div><div class="line">   ......</div><div class="line">   limit_req_zone $binary_remote_addr zone=test:10m rate=1r/s;</div><div class="line">   ......</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>限流逻辑<br><figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line">http &#123;</div><div class="line">   ......</div><div class="line">   server &#123;</div><div class="line">       ......</div><div class="line">       location /limit &#123;</div><div class="line">           limit_req zone = test burst=5 nodelay; #burst为0，且为nodelay模式</div><div class="line">           echo "success";</div><div class="line">       &#125;</div><div class="line">       ......</div><div class="line">   &#125;</div><div class="line">   ......</div><div class="line">   </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>测试代码<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">NginxLimit</span> </span>&#123;</div><div class="line"></div><div class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> IOException, InterruptedException </span>&#123;</div><div class="line">        <span class="keyword">final</span> NginxLimit distrubuteLimit = <span class="keyword">new</span> NginxLimit();</div><div class="line">        <span class="keyword">final</span> CountDownLatch latch = <span class="keyword">new</span> CountDownLatch(<span class="number">1</span>);<span class="comment">//两个工人的协作</span></div><div class="line">        <span class="keyword">final</span> Random random = <span class="keyword">new</span> Random(<span class="number">10</span>);</div><div class="line">        <span class="comment">//阶段一</span></div><div class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10</span>; i++) &#123;</div><div class="line">            <span class="keyword">final</span> <span class="keyword">int</span> finalI = i;</div><div class="line">            Thread t = <span class="keyword">new</span> Thread(<span class="keyword">new</span> Runnable() &#123;</div><div class="line">                <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</div><div class="line">                    <span class="keyword">try</span> &#123;</div><div class="line">                        latch.await();</div><div class="line">                        String rev = distrubuteLimit.sendGet(<span class="string">"http://192.168.235.190:8080/limit"</span>, <span class="keyword">null</span>);</div><div class="line">                        System.out.println(rev);</div><div class="line">                    &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;</div><div class="line">                        e.printStackTrace();</div><div class="line">                    &#125;</div><div class="line">                &#125;</div><div class="line">            &#125;);</div><div class="line">            t.start();</div><div class="line">        &#125;</div><div class="line">        latch.countDown();</div><div class="line">        <span class="comment">//阶段二</span></div><div class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10</span>; i++) &#123;</div><div class="line">            String rev = distrubuteLimit.sendGet(<span class="string">"http://192.168.235.190:8080/limit"</span>, <span class="keyword">null</span>);</div><div class="line">            System.out.println(rev);</div><div class="line">            <span class="keyword">try</span> &#123;</div><div class="line">                Thread.sleep(<span class="number">1000</span>);</div><div class="line">            &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;</div><div class="line">                e.printStackTrace();</div><div class="line">            &#125;</div><div class="line">        &#125;</div><div class="line">    </div><div class="line">        <span class="comment">//阶段三</span></div><div class="line">        <span class="keyword">final</span> CountDownLatch latch2 = <span class="keyword">new</span> CountDownLatch(<span class="number">1</span>);<span class="comment">//两个工人的协作</span></div><div class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10</span>; i++) &#123;</div><div class="line">            <span class="keyword">final</span> <span class="keyword">int</span> finalI = i;</div><div class="line">            Thread t2 = <span class="keyword">new</span> Thread(<span class="keyword">new</span> Runnable() &#123;</div><div class="line">                <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</div><div class="line">                    <span class="keyword">try</span> &#123;</div><div class="line">                        latch2.await();</div><div class="line">                        String rev = distrubuteLimit.sendGet(<span class="string">"http://192.168.235.190:8080/limit"</span>, <span class="keyword">null</span>);</div><div class="line">                        System.out.println(rev);</div><div class="line">                    &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;</div><div class="line">                        e.printStackTrace();</div><div class="line">                    &#125;</div><div class="line">                &#125;</div><div class="line">            &#125;);</div><div class="line">            t2.start();</div><div class="line">        &#125;</div><div class="line"></div><div class="line">        latch2.countDown();</div><div class="line">        System.in.read();</div><div class="line">    &#125;</div><div class="line">    .......</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div></pre></td><td class="code"><pre><div class="line">#阶段一</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:23 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:23 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:23 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:23 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:23 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:23 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:23 +0800] &quot;GET /limit?null HTTP/1.1&quot; 503 537 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:23 +0800] &quot;GET /limit?null HTTP/1.1&quot; 503 537 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:23 +0800] &quot;GET /limit?null HTTP/1.1&quot; 503 537 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:23 +0800] &quot;GET /limit?null HTTP/1.1&quot; 503 537 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">#阶段二</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:25 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:26 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:27 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:28 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:29 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:30 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:31 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:32 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:33 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:34 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">#阶段三</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:35 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:35 +0800] &quot;GET /limit?null HTTP/1.1&quot; 200 18 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:35 +0800] &quot;GET /limit?null HTTP/1.1&quot; 503 537 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:35 +0800] &quot;GET /limit?null HTTP/1.1&quot; 503 537 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:35 +0800] &quot;GET /limit?null HTTP/1.1&quot; 503 537 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:35 +0800] &quot;GET /limit?null HTTP/1.1&quot; 503 537 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:35 +0800] &quot;GET /limit?null HTTP/1.1&quot; 503 537 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:35 +0800] &quot;GET /limit?null HTTP/1.1&quot; 503 537 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:35 +0800] &quot;GET /limit?null HTTP/1.1&quot; 503 537 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div><div class="line">10.50.101.69 - - [08/Jul/2016:15:16:35 +0800] &quot;GET /limit?null HTTP/1.1&quot; 503 537 &quot;-&quot; &quot;Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)&quot;</div></pre></td></tr></table></figure>
+<p>nodelay模式下，limit_req允许一定程度的并发。<br>阶段一的时候，程序并发10个请求，一下子被处理完（不像之前delay模式下一秒一个地请求），其中前6个请求能被处理，后4个请求被限流。<br>阶段二的时候，程序每隔1秒发起1个请求，循环10次。由于令牌补充的速率也是1r/s，所以每次请求到达的时候都有令牌可取，请求正常。<br>阶段三的时候，程序有不少503，就是因为桶里面没有令牌了，请求被限流了。</p>
+<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><p>利用Nginx做分布式限流，主要用的就是<code>ngx_http_limit_conn_module</code>和<code>ngx_http_limit_req_module</code>模块。<br>ngx_http_limit_req_module通过配置nodelay参数决定使用漏桶算法还是令牌桶算法。<br>当使用delay参数的时候，请求会按照固定请求速率被处理，即使有突发流量涌入，也不会影响请求处理的速率。当请求速率大于固定请求速率+burst数量的时候，多余的请求会别限流抛弃。<br>当使用nodelay参数的时候，系统能处理的并发数取决于固定请求速率+burst里令牌数之和，然后令牌按照固定请求速率补充回令牌桶。<br>需要说明一下的是，以上的推论是按照网上的资料以及自己实验观察所得，仅供参考，不保证完全正确。<br>接下来最后一篇会学习用Openresty + Lua来实现接入层限流。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p><a href="http://nginx.org/en/docs/http/ngx_http_limit_conn_module.html" target="_blank" rel="external">ngx_http_limit_conn_module - http://nginx.org/en/docs/http/ngx_http_limit_conn_module.html</a><br><a href="http://nginx.org/en/docs/http/ngx_http_limit_req_module.html" target="_blank" rel="external">ngx_http_limit_req_module - http://nginx.org/en/docs/http/ngx_http_limit_req_module.html</a></p>
+<p>欢迎关注个人公众号<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/wechat.png" alt="Ray乐园"></p>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2016/07/06/rate-limit4/">系统限流实践 - 接入层限流(上)</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Ray</a></p>
+        <p><span>发布时间:</span>2016-07-06, 09:34:51</p>
+        <p><span>最后更新:</span>2016-12-23, 15:45:41</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2016/07/06/rate-limit4/" title="系统限流实践 - 接入层限流(上)">http://lzw2006.github.io/2016/07/06/rate-limit4/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://lzw2006.github.io/2016/07/06/rate-limit4/　　作者: Ray" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target = "_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2016/07/07/elk/">
+                    用ELK搭建简单的日志收集分析系统
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2016/06/30/rate-limit3/">
+                    系统限流实践 - 分布式限流
+                </a>
+            </div>
+        
+    </nav>
+
+
+<!-- 打赏代码 -->
+<div class="post-donate">
+    <div id="donate_board" class="donate_bar center">
+        <a id="btn_donate" class="btn_donate" href="javascript:;" title="Donate 打赏" target="_blank"></a>
+        <span class="donate_txt">
+           ↑<br>
+
+            欣赏此文？赏份狗粮！
+
+        </span>
+        <br>
+    </div>
+
+    <div id="donate_guide" class="donate_bar center hidden">
+
+        <a href="http://7xsmef.com1.z0.glb.clouddn.com/ali_pay.png" title="支付宝打赏" class="fancybox" rel="article0" style="float:left;margin-left:25%;margin-right:2px;" target="_blank">
+            <img src="http://7xsmef.com1.z0.glb.clouddn.com/ali_pay.png" title="支付宝打赏" height="164px" width="164px">
+        </a>
+
+
+
+        <a href="http://7xsmef.com1.z0.glb.clouddn.com/wechat_pay.JPG" title="微信打赏" class="fancybox" rel="article0" target="_blank">
+            <img src="http://7xsmef.com1.z0.glb.clouddn.com/wechat_pay.JPG" title="微信打赏" height="164px" width="164px">
+        </a>
+
+
+    </div>
+
+    <script type="text/javascript">
+        document.getElementById('btn_donate').onclick = function(){
+            $('#donate_board').addClass('hidden');
+            $('#donate_guide').removeClass('hidden');
+        }
+    </script>
+</div>
+<!-- 打赏代码END -->
+  
+</article>
+
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#目录"><span class="toc-number">1.</span> <span class="toc-text">目录</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#开篇"><span class="toc-number">2.</span> <span class="toc-text">开篇</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#接入层限流"><span class="toc-number">3.</span> <span class="toc-text">接入层限流</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#ngx-http-limit-conn-module"><span class="toc-number">3.1.</span> <span class="toc-text">ngx_http_limit_conn_module</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#配置示例"><span class="toc-number">3.1.1.</span> <span class="toc-text">配置示例</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#limit-conn的主要执行过程"><span class="toc-number">3.1.2.</span> <span class="toc-text">limit_conn的主要执行过程</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#按照IP限制并发连接数"><span class="toc-number">3.1.3.</span> <span class="toc-text">按照IP限制并发连接数</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#按照域名限流"><span class="toc-number">3.1.4.</span> <span class="toc-text">按照域名限流</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#ngx-http-limit-req-module"><span class="toc-number">3.2.</span> <span class="toc-text">ngx_http_limit_req_module</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#配置示例-1"><span class="toc-number">3.2.1.</span> <span class="toc-text">配置示例</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#limit-req的主要执行过程"><span class="toc-number">3.2.2.</span> <span class="toc-text">limit_req的主要执行过程</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#固定请求速率为1r-s，bustr为0"><span class="toc-number">3.2.3.</span> <span class="toc-text">固定请求速率为1r/s，bustr为0</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#固定请求速率为1r-s，burst为5"><span class="toc-number">3.2.4.</span> <span class="toc-text">固定请求速率为1r/s，burst为5</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#固定请求速率为1r-s，burst为5，nodelay"><span class="toc-number">3.2.5.</span> <span class="toc-text">固定请求速率为1r/s，burst为5，nodelay</span></a></li></ol></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#总结"><span class="toc-number">4.</span> <span class="toc-text">总结</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#参考资料"><span class="toc-number">5.</span> <span class="toc-text">参考资料</span></a></li></ol>
+</div>
+<style>
+    .left-col .switch-btn,
+    .left-col .switch-area {
+        display: none;
+    }
+</style>
+
+<input type="button" id="tocButton" value="隐藏目录"  title="点击按钮隐藏或者显示文章目录">
+
+<script>
+    yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+</script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></i></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":"系统限流实践 - 接入层限流(上)　| Ray的博客　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+      <div class="duoshuo" id="comments">
+    <div id="comment-box" ></div>
+    <div class="ds-thread" data-thread-key="2016/07/06/rate-limit4/" data-title="系统限流实践 - 接入层限流(上)" data-url="http://lzw2006.github.io/2016/07/06/rate-limit4/"></div>
+    <script>
+        var duoshuoQuery = {short_name:"rayleung"};
+        var loadComment = function(){
+            var d = document, s = d.createElement('script');
+            s.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+            s.async = true; s.charset = 'UTF-8';
+            (d.head || d.body).appendChild(s);
+        }
+
+        
+    </script>
+    
+    <script> loadComment(); </script>
+
+</div>
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2016/07/07/elk/" title="上一篇: 用ELK搭建简单的日志收集分析系统">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2016/06/30/rate-limit3/" title="下一篇: 系统限流实践 - 分布式限流">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2017/03/01/thread/">ThreadLocal - 是怎样炼成的</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/12/23/mybatis-1/">Mybatis - 各种方式配置</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/09/20/spring-netfix-register/">Spring Cloud服务发现</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/09/14/spring-config/">Spring Config学习</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/17/codis/">利用Docker安装运行Codis</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/13/jvm-classfile/">我的JVM之旅-ClassFile</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/12/rate-limit5/">系统限流实践 - 接入层限流(下*完结)</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/07/elk/">用ELK搭建简单的日志收集分析系统</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/06/rate-limit4/">系统限流实践 - 接入层限流(上)</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/30/rate-limit3/">系统限流实践 - 分布式限流</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/23/rate-limit2/">系统限流实践 - 应用限流</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/23/rate-limit/">系统限流实践 - 理论篇</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/20/create-hexo-github-site/">利用hexo和github搭建自己的免费博客</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/16/my-new-blog/">终于开通私人博客啦！</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2016-2017 Ray
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.0">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style='display:none'>
+                        <span id="site-visit" >本站到访数: 
+                            <span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>, </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style='display:none'>
+                        <span id="page-visit">本页阅读量: 
+                            <span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 10;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

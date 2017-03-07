@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no" />
+<meta name="author" content="Ray" />
+
+
+
+<meta name="description" content="缘起最近接触到SpringCloud，发现真是用来实现微服务的好东西。国内关于微服务的框架大家知道最多的就是Doubble，可是Doubble只实现了服务治理，很多功能都还需要用户自己去扩展，而Spring Cloud已经提供了很多现成的框架来实现微服务设计的各种构件。
+什么是SpringConfigSpringConfig是SpringCloud提供的一个外部化配置应用，通过SpringConf">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spring Config学习">
+<meta property="og:url" content="http://lzw2006.github.io/2016/09/14/spring-config/index.html">
+<meta property="og:site_name" content="Ray的博客">
+<meta property="og:description" content="缘起最近接触到SpringCloud，发现真是用来实现微服务的好东西。国内关于微服务的框架大家知道最多的就是Doubble，可是Doubble只实现了服务治理，很多功能都还需要用户自己去扩展，而Spring Cloud已经提供了很多现成的框架来实现微服务设计的各种构件。
+什么是SpringConfigSpringConfig是SpringCloud提供的一个外部化配置应用，通过SpringConf">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-1.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-2.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-3.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-4.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-5.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-6.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-7.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-8.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-9.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-10.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-11.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/wechat.png">
+<meta property="og:updated_time" content="2016-12-23T07:45:41.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Spring Config学习">
+<meta name="twitter:description" content="缘起最近接触到SpringCloud，发现真是用来实现微服务的好东西。国内关于微服务的框架大家知道最多的就是Doubble，可是Doubble只实现了服务治理，很多功能都还需要用户自己去扩展，而Spring Cloud已经提供了很多现成的框架来实现微服务设计的各种构件。
+什么是SpringConfigSpringConfig是SpringCloud提供的一个外部化配置应用，通过SpringConf">
+<meta name="twitter:image" content="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-1.png">
+
+<link rel="apple-touch-icon" href= "/apple-touch-icon.png">
+
+
+    <link rel="alternative" href="/atom.xml" title="Ray的博客" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title>Spring Config学习 | Ray的博客</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        open_in_new: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: undefined
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Ray</a></h1>
+        </hgroup>
+
+        
+        <p class="header-subtitle">Java攻城狮|经济小学徒|模型小爱好</p>
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">所有文章</a></li>
+                        
+                            <li><a href="/tags/">标签云</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:rayleung_xyz@126.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                                <a class="fa RSS" target="_blank" href="/atom.xml" title="RSS"></a>
+                            
+                                <a class="fa CSDN" target="_blank" href="http://blog.csdn.net/lzw_2006" title="CSDN"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/JAVA/">JAVA</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/">JVM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mybatis/">Mybatis</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/ORM/">ORM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/">Thread</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/spring/">spring</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/spring-cloud/">spring-cloud</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/中间件/">中间件</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/其他/">其他</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/基础设施/">基础设施</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/念念碎/">念念碎</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/技术/">技术</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/日志归集/">日志归集</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/架构/">架构</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/系统限流/">系统限流</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a target="_blank" class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                      <a target="_blank" class="main-nav-link switch-friends-link" href="http://lixuanbin.github.io/">秦沙</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">喜欢IT技术，喜欢经济，喜欢模型</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Ray</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Ray</a></h1>
+            </hgroup>
+            
+            <p class="header-subtitle">Java攻城狮|经济小学徒|模型小爱好</p>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">所有文章</a></li>
+                
+                    <li><a href="/tags/">标签云</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:rayleung_xyz@126.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                                <a class="fa RSS" target="_blank" href="/atom.xml" title="RSS"></a>
+                            
+                                <a class="fa CSDN" target="_blank" href="http://blog.csdn.net/lzw_2006" title="CSDN"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我"/>
+</nav>
+      <div class="body-wrap"><article id="post-spring-config" class="article article-type-post" itemscope itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2016/09/14/spring-config/" class="article-date">
+      <time datetime="2016-09-14T04:43:00.000Z" itemprop="datePublished">2016-09-14</time>
+</a>
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy" />
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      Spring Config学习
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/spring/">spring</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/spring-cloud/">spring-cloud</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <h1 id="缘起"><a href="#缘起" class="headerlink" title="缘起"></a>缘起</h1><p>最近接触到SpringCloud，发现真是用来实现微服务的好东西。国内关于微服务的框架大家知道最多的就是Doubble，可是Doubble只实现了服务治理，很多功能都还需要用户自己去扩展，而Spring Cloud已经提供了很多现成的框架来实现微服务设计的各种构件。</p>
+<h1 id="什么是SpringConfig"><a href="#什么是SpringConfig" class="headerlink" title="什么是SpringConfig"></a>什么是SpringConfig</h1><p>SpringConfig是SpringCloud提供的一个外部化配置应用，通过SpringConfig，分布式应用能够从中央仓库获取配置。这样带来的好处是当配置变更的时候，不需要像巨石型应用那样需要对应用进行重启，试想一下如果你的应用有10个、100个、1000个实例的时候，配置的变更是一个很麻烦的问题。</p>
+<h1 id="构建一个Config-Server"><a href="#构建一个Config-Server" class="headerlink" title="构建一个Config Server"></a>构建一个Config Server</h1><h2 id="依赖配置"><a href="#依赖配置" class="headerlink" title="依赖配置"></a>依赖配置</h2><p><strong>添加基本的依赖</strong><br>1.SpringBoot基本依赖<br>2.SpringCloud基本依赖<br>3.ConfigServer基本依赖</p>
+<a id="more"></a>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div></pre></td><td class="code"><pre><div class="line">&lt;!--SpringBoot基本依赖--&gt;</div><div class="line">&lt;parent&gt;</div><div class="line">    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;</div><div class="line">    &lt;artifactId&gt;spring-boot-starter-parent&lt;/artifactId&gt;</div><div class="line">    &lt;version&gt;1.3.5.RELEASE&lt;/version&gt;</div><div class="line">&lt;/parent&gt;</div><div class="line"></div><div class="line">&lt;!--SpringCloud基本依赖--&gt;</div><div class="line">&lt;dependencyManagement&gt;</div><div class="line">    &lt;dependencies&gt;</div><div class="line">        &lt;dependency&gt;</div><div class="line">            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;</div><div class="line">            &lt;artifactId&gt;spring-cloud-dependencies&lt;/artifactId&gt;</div><div class="line">            &lt;version&gt;Brixton.RELEASE&lt;/version&gt;</div><div class="line">            &lt;type&gt;pom&lt;/type&gt;</div><div class="line">            &lt;scope&gt;import&lt;/scope&gt;</div><div class="line">        &lt;/dependency&gt;</div><div class="line">    &lt;/dependencies&gt;</div><div class="line">&lt;/dependencyManagement&gt;</div><div class="line"></div><div class="line">&lt;!--ConfigServer依赖--&gt;</div><div class="line">&lt;dependencies&gt;</div><div class="line">    &lt;dependency&gt;</div><div class="line">        &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;</div><div class="line">        &lt;artifactId&gt;spring-cloud-config-server&lt;/artifactId&gt;</div><div class="line">    &lt;/dependency&gt;</div><div class="line">&lt;/dependencies&gt;</div><div class="line"></div><div class="line">&lt;build&gt;</div><div class="line">    &lt;plugins&gt;</div><div class="line">        &lt;plugin&gt;</div><div class="line">            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;</div><div class="line">            &lt;artifactId&gt;spring-boot-maven-plugin&lt;/artifactId&gt;</div><div class="line">        &lt;/plugin&gt;</div><div class="line">    &lt;/plugins&gt;</div><div class="line">&lt;/build&gt;</div></pre></td></tr></table></figure>
+<h2 id="创建主类"><a href="#创建主类" class="headerlink" title="创建主类"></a>创建主类</h2><p>添加<strong>@EnableConfigServer</strong>来表明这是一个ConfigServer<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="meta">@SpringBootApplication</span></div><div class="line"><span class="meta">@EnableConfigServer</span></div><div class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ConfigApplication</span> </span>&#123;</div><div class="line"></div><div class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</div><div class="line">        SpringApplication.run(ConfigApplication.class, args);</div><div class="line">    &#125;</div><div class="line"></div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<h2 id="配置仓库设置"><a href="#配置仓库设置" class="headerlink" title="配置仓库设置"></a>配置仓库设置</h2><p>ConfigServer背后默认使用Git作为仓库，所有仓库都配置在Git上。实际上也可以使用文件或者SVN来作为配置仓库</p>
+<h3 id="利用Git作为配置仓库"><a href="#利用Git作为配置仓库" class="headerlink" title="利用Git作为配置仓库"></a>利用Git作为配置仓库</h3><p>Git使用SpringConfig作为默认仓库<br>首先在oschina上新建一个repository，这里我起一个repository叫SpringCloudLearning，然后在里面建立一个myapp.yml，添加键值”mykey: key1”(注意有空格),<a href="https://github.com/lzw2006/springcloudlearning" target="_blank" rel="external">https://github.com/lzw2006/springcloudlearning</a></p>
+<p>在<code>application.yml</code>上添加配置<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">server:</div><div class="line">  port: 8888</div><div class="line"></div><div class="line">spring:</div><div class="line">  cloud:</div><div class="line">    config:</div><div class="line">      server:</div><div class="line">        git:</div><div class="line">          uri: https://git.oschina.net/lzw_2006/SpringCloudLearning</div></pre></td></tr></table></figure></p>
+<p><code>spring.cloud.config.server.git.uri</code>指向刚才建立的repository</p>
+<h3 id="利用SVN作为配置仓库"><a href="#利用SVN作为配置仓库" class="headerlink" title="利用SVN作为配置仓库"></a>利用SVN作为配置仓库</h3><p>使用SVN作为仓库需要添加和修改一些配置</p>
+<ol>
+<li><p>添加SVN的依赖</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">&lt;dependency&gt;</div><div class="line">    &lt;groupId&gt;org.tmatesoft.svnkit&lt;/groupId&gt;</div><div class="line">    &lt;artifactId&gt;svnkit&lt;/artifactId&gt;</div><div class="line">&lt;/dependency&gt;</div></pre></td></tr></table></figure>
+</li>
+<li><p>修改application.yml配置</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line">server:</div><div class="line">  port: 9999</div><div class="line">spring:</div><div class="line">  profiles:</div><div class="line">    active: subversion</div><div class="line">  cloud:</div><div class="line">    config:</div><div class="line">      server:</div><div class="line">        svn:</div><div class="line">          uri: svn://svn.xxxx.com/development/xxx-project</div><div class="line">          username: yourname</div><div class="line">          password: yourpassword</div><div class="line"></div><div class="line">#spring:</div><div class="line">#  cloud:</div><div class="line">#    config:</div><div class="line">#      server:</div><div class="line">#        git:</div><div class="line">#          uri: https://github.com/lzw2006/springcloudlearning</div></pre></td></tr></table></figure>
+</li>
+</ol>
+<p>SVN默认{label}是trunk分支</p>
+<h3 id="配置文件系统作为配置仓库"><a href="#配置文件系统作为配置仓库" class="headerlink" title="配置文件系统作为配置仓库"></a>配置文件系统作为配置仓库</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">server:</div><div class="line">  port: 8080</div><div class="line">spring:</div><div class="line">  profiles:</div><div class="line">    active: native</div><div class="line">  cloud:</div><div class="line">    config:</div><div class="line">      server:</div><div class="line">        native:</div><div class="line">          search-locations: /tmp</div></pre></td></tr></table></figure>
+<p>要使用文件系统作为配置仓库，需要把spring.profiles.active设置为native。<br>search-locations配置扫描位置，可以是目录，也可以是classpath</p>
+<h2 id="测试"><a href="#测试" class="headerlink" title="测试"></a>测试</h2><p>ConfigServer能够通过以下几种http形式访问配置</p>
+<ul>
+<li>/{application}/{profile}[/{label}]</li>
+<li>/{application}-{profile}.yml</li>
+<li>/{label}/{application}-{profile}.yml</li>
+<li>/{application}-{profile}.properties</li>
+<li>/{lable}/{application}-{profile}.properties</li>
+</ul>
+<p>首先启动ConfigServer<br>然后在浏览器里面访问以下url<br><a href="http://localhost:8888/myapp/default" target="_blank" rel="external">http://localhost:8888/myapp/default</a><br>得到以下的响应<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-1.png" alt=""><br>请求的url指定profile为default，因为找不到名为<code>myapp-default</code>的profile，所以直接返回github上myapp.yml里面的配置了</p>
+<p>接下来我们在github上添加两个配置文件，一个叫myapp-dev，另一个叫myapp-test<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-2.png" alt=""><br><img src="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-3.png" alt=""><br><img src="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-4.png" alt=""></p>
+<p>首先访问myapp-dev的配置<br><a href="http://localhost:8888/myapp/dev" target="_blank" rel="external">http://localhost:8888/myapp/dev</a><br>得到以下的响应<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-5.png" alt=""><br>通过指定<code>dev</code>这个profile，默认选择了myapp-dev.yml这个配置，<code>test</code>同理</p>
+<p>小结：</p>
+<h1 id="通过微服务来获取配置"><a href="#通过微服务来获取配置" class="headerlink" title="通过微服务来获取配置"></a>通过微服务来获取配置</h1><h2 id="依赖配置-1"><a href="#依赖配置-1" class="headerlink" title="依赖配置"></a>依赖配置</h2><p>添加基本的依赖<br>1.SpringBoot基本依赖<br>2.SpringCloud基本依赖<br>3.Actuator依赖<br>为了能够动态地更新配置，Actuator依赖是必须要加的，后面会介绍怎样实现动态更新配置<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div></pre></td><td class="code"><pre><div class="line">&lt;parent&gt;</div><div class="line">        &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;</div><div class="line">        &lt;artifactId&gt;spring-boot-starter-parent&lt;/artifactId&gt;</div><div class="line">        &lt;version&gt;1.3.5.RELEASE&lt;/version&gt;</div><div class="line">    &lt;/parent&gt;</div><div class="line"></div><div class="line">    &lt;dependencyManagement&gt;</div><div class="line">        &lt;dependencies&gt;</div><div class="line">            &lt;dependency&gt;</div><div class="line">                &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;</div><div class="line">                &lt;artifactId&gt;spring-cloud-dependencies&lt;/artifactId&gt;</div><div class="line">                &lt;version&gt;Brixton.RELEASE&lt;/version&gt;</div><div class="line">                &lt;type&gt;pom&lt;/type&gt;</div><div class="line">                &lt;scope&gt;import&lt;/scope&gt;</div><div class="line">            &lt;/dependency&gt;</div><div class="line">        &lt;/dependencies&gt;</div><div class="line">    &lt;/dependencyManagement&gt;</div><div class="line"></div><div class="line">    &lt;dependencies&gt;</div><div class="line">        &lt;dependency&gt;</div><div class="line">            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;</div><div class="line">            &lt;artifactId&gt;spring-cloud-starter-config&lt;/artifactId&gt;</div><div class="line">        &lt;/dependency&gt;</div><div class="line">        &lt;dependency&gt;</div><div class="line">            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;</div><div class="line">            &lt;artifactId&gt;spring-boot-starter-actuator&lt;/artifactId&gt;</div><div class="line">        &lt;/dependency&gt;</div><div class="line">        &lt;dependency&gt;</div><div class="line">            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;</div><div class="line">            &lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;</div><div class="line">        &lt;/dependency&gt;</div><div class="line">        &lt;dependency&gt;</div><div class="line">            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;</div><div class="line">            &lt;artifactId&gt;spring-boot-starter-test&lt;/artifactId&gt;</div><div class="line">            &lt;scope&gt;test&lt;/scope&gt;</div><div class="line">        &lt;/dependency&gt;</div><div class="line">    &lt;/dependencies&gt;</div><div class="line"></div><div class="line">    &lt;build&gt;</div><div class="line">        &lt;plugins&gt;</div><div class="line">            &lt;plugin&gt;</div><div class="line">                &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;</div><div class="line">                &lt;artifactId&gt;spring-boot-maven-plugin&lt;/artifactId&gt;</div><div class="line">            &lt;/plugin&gt;</div><div class="line">        &lt;/plugins&gt;</div><div class="line">    &lt;/build&gt;</div></pre></td></tr></table></figure></p>
+<h2 id="创建主类以及Controller"><a href="#创建主类以及Controller" class="headerlink" title="创建主类以及Controller"></a>创建主类以及Controller</h2><p>主类没有什么特别的<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">@SpringBootApplication</div><div class="line">public class ConfigApplication &#123;</div><div class="line"></div><div class="line">    public static void main(String[] args) &#123;</div><div class="line">        SpringApplication.run(ConfigApplication.class, args);</div><div class="line">    &#125;</div><div class="line"></div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>我们新建一个简单的Controller，能够通过url访问通过ConfigServer注入的value<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line">@RestController</div><div class="line">@RefreshScope</div><div class="line">public class MessageController &#123;</div><div class="line"></div><div class="line"></div><div class="line">    @Value(&quot;$&#123;mykey:defaultValue&#125;&quot;)</div><div class="line">    private String msg;</div><div class="line"></div><div class="line">    @RequestMapping(&quot;/msg&quot;)</div><div class="line">    @ResponseBody</div><div class="line">    public String message() &#123;</div><div class="line">        return msg;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>如果配置服务器失效，msg的值将会取默认值”defaultValue”</p>
+<h2 id="配置需要访问的ConfigServer"><a href="#配置需要访问的ConfigServer" class="headerlink" title="配置需要访问的ConfigServer"></a>配置需要访问的ConfigServer</h2><p>新建bootstrap.yml，添加如下配置<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">spring:</div><div class="line">  cloud:</div><div class="line">    config:</div><div class="line">      uri: http://localhost:8888/</div><div class="line">      profile: dev</div><div class="line">  application:</div><div class="line">    name: myapp</div></pre></td></tr></table></figure></p>
+<ul>
+<li>spring.application.name：对应前配置文件中的{application}部分</li>
+<li>spring.cloud.config.profile：对应前配置文件中的{profile}部分</li>
+<li>spring.cloud.config.label：对应前配置文件的git分支</li>
+<li>spring.cloud.config.uri：配置中心的地址</li>
+</ul>
+<h2 id="验证"><a href="#验证" class="headerlink" title="验证"></a>验证</h2><h3 id="配置中心失效，读取默认配置"><a href="#配置中心失效，读取默认配置" class="headerlink" title="配置中心失效，读取默认配置"></a>配置中心失效，读取默认配置</h3><p>单独启动客户端，访问msg接口，得到默认值<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-6.png" alt=""></p>
+<h3 id="配置中心和客户端同时启动，取得配置中心的值"><a href="#配置中心和客户端同时启动，取得配置中心的值" class="headerlink" title="配置中心和客户端同时启动，取得配置中心的值"></a>配置中心和客户端同时启动，取得配置中心的值</h3><p>github上的配置<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-7.png" alt=""><br>调用msg接口返回的内容<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-8.png" alt=""></p>
+<h3 id="在配置中心和客户端启动的情况下，修改github上的配置，动态刷新客户端配置"><a href="#在配置中心和客户端启动的情况下，修改github上的配置，动态刷新客户端配置" class="headerlink" title="在配置中心和客户端启动的情况下，修改github上的配置，动态刷新客户端配置"></a>在配置中心和客户端启动的情况下，修改github上的配置，动态刷新客户端配置</h3><p>之前提到过spring-boot-starter-actuator这个插件，这里就派上用场了。<br>当添加了上面这个插件之后，配合@RefreshScope注解，通过POST方法调用形如 <a href="http://localhost:8080/refresh" target="_blank" rel="external">http://localhost:8080/refresh</a> 接口，就能够实现动态地更新配置。<br>原理是当调用refresh接口后，client就会更新环境变量里面的信息，但这还不够，由于我们使用的bean基本都是单例，之前注入的旧的属性值并不会跟着更新，这时候就要借助@RefreshScope注解告诉Spring当配置更新后，需要重新生成这个单例，于是新的属性值就被注入进来了。<br>首先更改github上的值为key-dev-refresh<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-9.png" alt=""><br>然后往client发送refresh的post请求<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-10.png" alt=""><br>最后往client发送msg请求<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/spring-cloud-config-11.png" alt=""></p>
+<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><p>配置中心的基本配置就完成了，跟多的玩法需要大家去细致研究一下spring的文档</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p><a href="http://blog.didispace.com/springcloud4/" target="_blank" rel="external">http://blog.didispace.com/springcloud4/</a></p>
+<p>欢迎关注个人公众号<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/wechat.png" alt="Ray乐园"></p>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2016/09/14/spring-config/">Spring Config学习</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Ray</a></p>
+        <p><span>发布时间:</span>2016-09-14, 12:43:00</p>
+        <p><span>最后更新:</span>2016-12-23, 15:45:41</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2016/09/14/spring-config/" title="Spring Config学习">http://lzw2006.github.io/2016/09/14/spring-config/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://lzw2006.github.io/2016/09/14/spring-config/　　作者: Ray" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target = "_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2016/09/20/spring-netfix-register/">
+                    Spring Cloud服务发现
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2016/07/17/codis/">
+                    利用Docker安装运行Codis
+                </a>
+            </div>
+        
+    </nav>
+
+
+<!-- 打赏代码 -->
+<div class="post-donate">
+    <div id="donate_board" class="donate_bar center">
+        <a id="btn_donate" class="btn_donate" href="javascript:;" title="Donate 打赏" target="_blank"></a>
+        <span class="donate_txt">
+           ↑<br>
+
+            欣赏此文？赏份狗粮！
+
+        </span>
+        <br>
+    </div>
+
+    <div id="donate_guide" class="donate_bar center hidden">
+
+        <a href="http://7xsmef.com1.z0.glb.clouddn.com/ali_pay.png" title="支付宝打赏" class="fancybox" rel="article0" style="float:left;margin-left:25%;margin-right:2px;" target="_blank">
+            <img src="http://7xsmef.com1.z0.glb.clouddn.com/ali_pay.png" title="支付宝打赏" height="164px" width="164px">
+        </a>
+
+
+
+        <a href="http://7xsmef.com1.z0.glb.clouddn.com/wechat_pay.JPG" title="微信打赏" class="fancybox" rel="article0" target="_blank">
+            <img src="http://7xsmef.com1.z0.glb.clouddn.com/wechat_pay.JPG" title="微信打赏" height="164px" width="164px">
+        </a>
+
+
+    </div>
+
+    <script type="text/javascript">
+        document.getElementById('btn_donate').onclick = function(){
+            $('#donate_board').addClass('hidden');
+            $('#donate_guide').removeClass('hidden');
+        }
+    </script>
+</div>
+<!-- 打赏代码END -->
+  
+</article>
+
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#缘起"><span class="toc-number">1.</span> <span class="toc-text">缘起</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#什么是SpringConfig"><span class="toc-number">2.</span> <span class="toc-text">什么是SpringConfig</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#构建一个Config-Server"><span class="toc-number">3.</span> <span class="toc-text">构建一个Config Server</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#依赖配置"><span class="toc-number">3.1.</span> <span class="toc-text">依赖配置</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#创建主类"><span class="toc-number">3.2.</span> <span class="toc-text">创建主类</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#配置仓库设置"><span class="toc-number">3.3.</span> <span class="toc-text">配置仓库设置</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#利用Git作为配置仓库"><span class="toc-number">3.3.1.</span> <span class="toc-text">利用Git作为配置仓库</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#利用SVN作为配置仓库"><span class="toc-number">3.3.2.</span> <span class="toc-text">利用SVN作为配置仓库</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#配置文件系统作为配置仓库"><span class="toc-number">3.3.3.</span> <span class="toc-text">配置文件系统作为配置仓库</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#测试"><span class="toc-number">3.4.</span> <span class="toc-text">测试</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#通过微服务来获取配置"><span class="toc-number">4.</span> <span class="toc-text">通过微服务来获取配置</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#依赖配置-1"><span class="toc-number">4.1.</span> <span class="toc-text">依赖配置</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#创建主类以及Controller"><span class="toc-number">4.2.</span> <span class="toc-text">创建主类以及Controller</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#配置需要访问的ConfigServer"><span class="toc-number">4.3.</span> <span class="toc-text">配置需要访问的ConfigServer</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#验证"><span class="toc-number">4.4.</span> <span class="toc-text">验证</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#配置中心失效，读取默认配置"><span class="toc-number">4.4.1.</span> <span class="toc-text">配置中心失效，读取默认配置</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#配置中心和客户端同时启动，取得配置中心的值"><span class="toc-number">4.4.2.</span> <span class="toc-text">配置中心和客户端同时启动，取得配置中心的值</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#在配置中心和客户端启动的情况下，修改github上的配置，动态刷新客户端配置"><span class="toc-number">4.4.3.</span> <span class="toc-text">在配置中心和客户端启动的情况下，修改github上的配置，动态刷新客户端配置</span></a></li></ol></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#总结"><span class="toc-number">5.</span> <span class="toc-text">总结</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#参考资料"><span class="toc-number">6.</span> <span class="toc-text">参考资料</span></a></li></ol>
+</div>
+<style>
+    .left-col .switch-btn,
+    .left-col .switch-area {
+        display: none;
+    }
+</style>
+
+<input type="button" id="tocButton" value="隐藏目录"  title="点击按钮隐藏或者显示文章目录">
+
+<script>
+    yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+</script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></i></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":"Spring Config学习　| Ray的博客　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+      <div class="duoshuo" id="comments">
+    <div id="comment-box" ></div>
+    <div class="ds-thread" data-thread-key="2016/09/14/spring-config/" data-title="Spring Config学习" data-url="http://lzw2006.github.io/2016/09/14/spring-config/"></div>
+    <script>
+        var duoshuoQuery = {short_name:"rayleung"};
+        var loadComment = function(){
+            var d = document, s = d.createElement('script');
+            s.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+            s.async = true; s.charset = 'UTF-8';
+            (d.head || d.body).appendChild(s);
+        }
+
+        
+    </script>
+    
+    <script> loadComment(); </script>
+
+</div>
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2016/09/20/spring-netfix-register/" title="上一篇: Spring Cloud服务发现">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2016/07/17/codis/" title="下一篇: 利用Docker安装运行Codis">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2017/03/01/thread/">ThreadLocal - 是怎样炼成的</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/12/23/mybatis-1/">Mybatis - 各种方式配置</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/09/20/spring-netfix-register/">Spring Cloud服务发现</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/09/14/spring-config/">Spring Config学习</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/17/codis/">利用Docker安装运行Codis</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/13/jvm-classfile/">我的JVM之旅-ClassFile</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/12/rate-limit5/">系统限流实践 - 接入层限流(下*完结)</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/07/elk/">用ELK搭建简单的日志收集分析系统</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/06/rate-limit4/">系统限流实践 - 接入层限流(上)</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/30/rate-limit3/">系统限流实践 - 分布式限流</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/23/rate-limit2/">系统限流实践 - 应用限流</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/23/rate-limit/">系统限流实践 - 理论篇</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/20/create-hexo-github-site/">利用hexo和github搭建自己的免费博客</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/16/my-new-blog/">终于开通私人博客啦！</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2016-2017 Ray
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.0">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style='display:none'>
+                        <span id="site-visit" >本站到访数: 
+                            <span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>, </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style='display:none'>
+                        <span id="page-visit">本页阅读量: 
+                            <span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 10;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

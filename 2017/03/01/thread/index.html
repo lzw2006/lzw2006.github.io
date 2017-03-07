@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no" />
+<meta name="author" content="Ray" />
+
+
+
+<meta name="description" content="好久没更新博客了，一直都有学习新知识，但是没时间总结,主要因为顾着去发展模型兴趣去了哈难得静下来写一篇博客闲话不多说，直接进入主题
+缘起两年前因为工作关系，曾经研究过ThreadLocal源码一段时间，不过研究得不够透彻。最近偶然间又接触到ThreadLocal，又有了新的认识，因此写篇博客记录下来，顺便抛砖引玉一下。网上很多人都会把ThreadLocal类比为Map来实现的，如果你真的这样认为，">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ThreadLocal - 是怎样炼成的">
+<meta property="og:url" content="http://lzw2006.github.io/2017/03/01/thread/index.html">
+<meta property="og:site_name" content="Ray的博客">
+<meta property="og:description" content="好久没更新博客了，一直都有学习新知识，但是没时间总结,主要因为顾着去发展模型兴趣去了哈难得静下来写一篇博客闲话不多说，直接进入主题
+缘起两年前因为工作关系，曾经研究过ThreadLocal源码一段时间，不过研究得不够透彻。最近偶然间又接触到ThreadLocal，又有了新的认识，因此写篇博客记录下来，顺便抛砖引玉一下。网上很多人都会把ThreadLocal类比为Map来实现的，如果你真的这样认为，">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/thread_specific_storage.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/thread_specific_storage_custom.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/wechat.png">
+<meta property="og:updated_time" content="2017-03-07T02:29:44.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="ThreadLocal - 是怎样炼成的">
+<meta name="twitter:description" content="好久没更新博客了，一直都有学习新知识，但是没时间总结,主要因为顾着去发展模型兴趣去了哈难得静下来写一篇博客闲话不多说，直接进入主题
+缘起两年前因为工作关系，曾经研究过ThreadLocal源码一段时间，不过研究得不够透彻。最近偶然间又接触到ThreadLocal，又有了新的认识，因此写篇博客记录下来，顺便抛砖引玉一下。网上很多人都会把ThreadLocal类比为Map来实现的，如果你真的这样认为，">
+<meta name="twitter:image" content="http://7xsmef.com1.z0.glb.clouddn.com/thread_specific_storage.png">
+
+<link rel="apple-touch-icon" href= "/apple-touch-icon.png">
+
+
+    <link rel="alternative" href="/atom.xml" title="Ray的博客" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title>ThreadLocal - 是怎样炼成的 | Ray的博客</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        open_in_new: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: undefined
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Ray</a></h1>
+        </hgroup>
+
+        
+        <p class="header-subtitle">Java攻城狮|经济小学徒|模型小爱好</p>
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">所有文章</a></li>
+                        
+                            <li><a href="/tags/">标签云</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:rayleung_xyz@126.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                                <a class="fa RSS" target="_blank" href="/atom.xml" title="RSS"></a>
+                            
+                                <a class="fa CSDN" target="_blank" href="http://blog.csdn.net/lzw_2006" title="CSDN"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/JAVA/">JAVA</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/">JVM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mybatis/">Mybatis</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/ORM/">ORM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/">Thread</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/spring/">spring</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/spring-cloud/">spring-cloud</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/中间件/">中间件</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/其他/">其他</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/基础设施/">基础设施</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/念念碎/">念念碎</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/技术/">技术</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/日志归集/">日志归集</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/架构/">架构</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/系统限流/">系统限流</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a target="_blank" class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                      <a target="_blank" class="main-nav-link switch-friends-link" href="http://lixuanbin.github.io/">秦沙</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">喜欢IT技术，喜欢经济，喜欢模型</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Ray</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Ray</a></h1>
+            </hgroup>
+            
+            <p class="header-subtitle">Java攻城狮|经济小学徒|模型小爱好</p>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">所有文章</a></li>
+                
+                    <li><a href="/tags/">标签云</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:rayleung_xyz@126.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                                <a class="fa RSS" target="_blank" href="/atom.xml" title="RSS"></a>
+                            
+                                <a class="fa CSDN" target="_blank" href="http://blog.csdn.net/lzw_2006" title="CSDN"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我"/>
+</nav>
+      <div class="body-wrap"><article id="post-thread" class="article article-type-post" itemscope itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2017/03/01/thread/" class="article-date">
+      <time datetime="2017-03-01T03:00:00.000Z" itemprop="datePublished">2017-03-01</time>
+</a>
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy" />
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      ThreadLocal - 是怎样炼成的
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/JAVA/">JAVA</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Thread/">Thread</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/技术/">技术</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <p>好久没更新博客了，一直都有学习新知识，但是没时间总结,主要因为顾着去发展模型兴趣去了哈<br>难得静下来写一篇博客<br>闲话不多说，直接进入主题</p>
+<h1 id="缘起"><a href="#缘起" class="headerlink" title="缘起"></a>缘起</h1><p>两年前因为工作关系，曾经研究过ThreadLocal源码一段时间，不过研究得不够透彻。最近偶然间又接触到ThreadLocal，又有了新的认识，因此写篇博客记录下来，顺便抛砖引玉一下。<br>网上很多人都会把ThreadLocal类比为Map来实现的，如果你真的这样认为，借用最近我比较喜欢的一句话来说 — 年轻人，你真的太年轻了。<br>一般百度”ThreadLocal实现”，得到的文章都是类似下面的描述</p>
+<p><code>ThreadLocal是解决线程安全问题一个很好的思路，ThreadLocal类中有一个Map，用于存储每一个线程的变量副本，Map中元素的键为线程对象，而值对应线程的变量副本，由于Key值不可重复，每一个“线程对象”对应线程的“变量副本”，而到达了线程安全。</code></p>
+<p>其实上面的说法是不准确的<br><strong>ThreadLocal类并没有一个Map来保存数据，数据都是保存在线程实例上的</strong></p>
+<p>下面我们来剖析一下</p>
+<p>首先我们要介绍一种存储模式</p>
+<h1 id="线程特有存储模式-Thread-Specific-Storage"><a href="#线程特有存储模式-Thread-Specific-Storage" class="headerlink" title="线程特有存储模式 (Thread Specific Storage)"></a>线程特有存储模式 (Thread Specific Storage)</h1><p>这种模式是为了解决多线程变量共享导致线程安全和死锁问题，首先看看下面的示意图<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/thread_specific_storage.png" alt="线程特有存储模式"></p>
+<a id="more"></a>
+<p>ObjectX类会被多个线程使用到，为了避免线程安全以及可能的死锁为题，我们希望每个线程都有自己的ObjectX实例。<br>于是我们设计出一个代理类，用来代理保存和获取操作。</p>
+<p>实际上JDK已经提供了上述模式的实现，那就是今天的猪脚ThreadLocal</p>
+<p>首先看一个简单的ThreadLocal例子<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line">public class ThreadSpecificDateFormat &#123;</div><div class="line"></div><div class="line">    private static final ThreadLocal&lt;SimpleDateFormat&gt; TS_SDF = new ThreadLocal&lt;SimpleDateFormat&gt;() &#123;</div><div class="line">        @Override</div><div class="line">        protected SimpleDateFormat initialValue() &#123;</div><div class="line">            return new SimpleDateFormat();</div><div class="line">        &#125;</div><div class="line">    &#125;;</div><div class="line"></div><div class="line">    public static Date parse(String timeStamp, String format) throws ParseException &#123;</div><div class="line">        final SimpleDateFormat sdf = TS_SDF.get();</div><div class="line">        sdf.applyPattern(format);</div><div class="line">        Date date = sdf.parse(timeStamp);</div><div class="line">        return date;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    public static String format(Date date, String format) &#123;</div><div class="line">        final SimpleDateFormat sdf = TS_SDF.get();</div><div class="line">        sdf.applyPattern(format);</div><div class="line">        String strDate = sdf.format(date);</div><div class="line">        return strDate;</div><div class="line">    &#125;</div><div class="line"></div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>结合上图看，实例的统一接入点就是ThreadLocal.get()（TS_SDF.get()）这个方法了，通过这个接入点客户端就能拿到Object实例。</p>
+<p>接下来再看看get方法的具体实现<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line">public T get() &#123;</div><div class="line">    Thread t = Thread.currentThread();</div><div class="line">    ThreadLocalMap map = getMap(t);</div><div class="line">    if (map != null) &#123;</div><div class="line">        ThreadLocalMap.Entry e = map.getEntry(this);</div><div class="line">        if (e != null) &#123;</div><div class="line">            @SuppressWarnings(&quot;unchecked&quot;)</div><div class="line">            T result = (T)e.value;</div><div class="line">            return result;</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line">    return setInitialValue();</div><div class="line">&#125;</div><div class="line"></div><div class="line">ThreadLocalMap getMap(Thread t) &#123;</div><div class="line">    return t.threadLocals;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>第一步 先获通过Thread.currentThread（）取当前线程<br>第二步 然后获取当前线程的threadLocals属性<br>第三步 在threadLocals属性里获取Entry实例<br>第四部 从Entry实例的value属性里获取到最后所要的Object对象</p>
+<p>“当前线程的threadLocals(ThreadLocalMap类的实例)属性”就是担任之前说的”线程的局部存储”角色，因为实际存储的数据都是放在线程实例里的，而不是ThreadLocal实例里，客户端只是利用ThreadLocal作为一个中介去访问线程罢了</p>
+<p>接下来讨论一下上面出现的ThreadLocalMap类以及Entry类，直接贴源码<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">static</span> <span class="class"><span class="keyword">class</span> <span class="title">ThreadLocalMap</span> </span>&#123;</div><div class="line"></div><div class="line">        <span class="keyword">static</span> <span class="class"><span class="keyword">class</span> <span class="title">Entry</span> <span class="keyword">extends</span> <span class="title">WeakReference</span>&lt;<span class="title">ThreadLocal</span>&lt;?&gt;&gt; </span>&#123;</div><div class="line">            <span class="comment">/** The value associated with this ThreadLocal. */</span></div><div class="line">            Object value;</div><div class="line"></div><div class="line">            Entry(ThreadLocal&lt;?&gt; k, Object v) &#123;</div><div class="line">                <span class="keyword">super</span>(k);</div><div class="line">                value = v;</div><div class="line">            &#125;</div><div class="line">        &#125;</div><div class="line">        </div><div class="line"></div><div class="line">        ... ...</div><div class="line">        </div><div class="line"></div><div class="line">        <span class="comment">/**</span></div><div class="line">         * The table, resized as necessary.</div><div class="line">         * table.length MUST always be a power of two.</div><div class="line">         */</div><div class="line">        <span class="keyword">private</span> Entry[] table;</div><div class="line"></div><div class="line">        <span class="comment">/**</span></div><div class="line">         * The number of entries in the table.</div><div class="line">         */</div><div class="line">        <span class="keyword">private</span> <span class="keyword">int</span> size = <span class="number">0</span>;</div><div class="line">        </div><div class="line">        ... ... </div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>Entry是ThreadLocalMap的内部类，而且ThreadLocalMap里拥有一个类型为Entry[]的table属性，而线每个线程实例有自己的ThreadLocalMap。到这里结论已经很明显了，<br><strong>负责保存ThreadLocal的key和value根本就不是一个Map类型，而是一个Entry数组</strong>!</p>
+<p>Entry继承WeakReference，因此继承拥有一个弱引用referent，而且自身也有一个value属性。Entry利用referent来保存threadLocal实例的弱引用，利用value保存Object的强引用</p>
+<p>最后的问题是怎样在Entry数组里定位我们需要的Entry呢<br>还是看代码说话<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">private</span> Entry <span class="title">getEntry</span><span class="params">(ThreadLocal&lt;?&gt; key)</span> </span>&#123;</div><div class="line">    <span class="keyword">int</span> i = key.threadLocalHashCode &amp; (table.length - <span class="number">1</span>);</div><div class="line">    Entry e = table[i];</div><div class="line">    <span class="keyword">if</span> (e != <span class="keyword">null</span> &amp;&amp; e.get() == key)</div><div class="line">        <span class="keyword">return</span> e;</div><div class="line">    <span class="keyword">else</span></div><div class="line">        <span class="keyword">return</span> getEntryAfterMiss(key, i, e);</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>留意key.threadLocalHashCode这个属性，Entry在保存进Entry[]数组之前，会利用ThreadLocal的引用计算出一个hash值，然后利用这个hash值作为下标定位到Entry[]数组的某个位置；<br>相反，从Entry[]取Entry也是同样道理。</p>
+<p>最后来一个图来总结上面说的内容</p>
+<p><img src="http://7xsmef.com1.z0.glb.clouddn.com/thread_specific_storage_custom.png" alt="线程特有存储模式2"></p>
+<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><p>客户端访问ThreadLocal实例的get方法，get方法通过Thread.getCurrentThread获得当前线程的实例，从而获得当前线程的ThreadLocalMap对象，而ThreadLocalMap里包含了一个Entry数组，里面的每个Entry保存了ThreadLocal引用以及Object引用，Entry的referent保存ThreadLocal的弱引用，Entry的value保存Object的强引用。</p>
+<p>欢迎关注个人公众号<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/wechat.png" alt="Ray乐园"></p>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2017/03/01/thread/">ThreadLocal - 是怎样炼成的</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Ray</a></p>
+        <p><span>发布时间:</span>2017-03-01, 11:00:00</p>
+        <p><span>最后更新:</span>2017-03-07, 10:29:44</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2017/03/01/thread/" title="ThreadLocal - 是怎样炼成的">http://lzw2006.github.io/2017/03/01/thread/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://lzw2006.github.io/2017/03/01/thread/　　作者: Ray" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target = "_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2016/12/23/mybatis-1/">
+                    Mybatis - 各种方式配置
+                </a>
+            </div>
+        
+    </nav>
+
+
+<!-- 打赏代码 -->
+<div class="post-donate">
+    <div id="donate_board" class="donate_bar center">
+        <a id="btn_donate" class="btn_donate" href="javascript:;" title="Donate 打赏" target="_blank"></a>
+        <span class="donate_txt">
+           ↑<br>
+
+            欣赏此文？赏份狗粮！
+
+        </span>
+        <br>
+    </div>
+
+    <div id="donate_guide" class="donate_bar center hidden">
+
+        <a href="http://7xsmef.com1.z0.glb.clouddn.com/ali_pay.png" title="支付宝打赏" class="fancybox" rel="article0" style="float:left;margin-left:25%;margin-right:2px;" target="_blank">
+            <img src="http://7xsmef.com1.z0.glb.clouddn.com/ali_pay.png" title="支付宝打赏" height="164px" width="164px">
+        </a>
+
+
+
+        <a href="http://7xsmef.com1.z0.glb.clouddn.com/wechat_pay.JPG" title="微信打赏" class="fancybox" rel="article0" target="_blank">
+            <img src="http://7xsmef.com1.z0.glb.clouddn.com/wechat_pay.JPG" title="微信打赏" height="164px" width="164px">
+        </a>
+
+
+    </div>
+
+    <script type="text/javascript">
+        document.getElementById('btn_donate').onclick = function(){
+            $('#donate_board').addClass('hidden');
+            $('#donate_guide').removeClass('hidden');
+        }
+    </script>
+</div>
+<!-- 打赏代码END -->
+  
+</article>
+
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#缘起"><span class="toc-number">1.</span> <span class="toc-text">缘起</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#线程特有存储模式-Thread-Specific-Storage"><span class="toc-number">2.</span> <span class="toc-text">线程特有存储模式 (Thread Specific Storage)</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#总结"><span class="toc-number">3.</span> <span class="toc-text">总结</span></a></li></ol>
+</div>
+<style>
+    .left-col .switch-btn,
+    .left-col .switch-area {
+        display: none;
+    }
+</style>
+
+<input type="button" id="tocButton" value="隐藏目录"  title="点击按钮隐藏或者显示文章目录">
+
+<script>
+    yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+</script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></i></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":"ThreadLocal - 是怎样炼成的　| Ray的博客　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+      <div class="duoshuo" id="comments">
+    <div id="comment-box" ></div>
+    <div class="ds-thread" data-thread-key="2017/03/01/thread/" data-title="ThreadLocal - 是怎样炼成的" data-url="http://lzw2006.github.io/2017/03/01/thread/"></div>
+    <script>
+        var duoshuoQuery = {short_name:"rayleung"};
+        var loadComment = function(){
+            var d = document, s = d.createElement('script');
+            s.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+            s.async = true; s.charset = 'UTF-8';
+            (d.head || d.body).appendChild(s);
+        }
+
+        
+    </script>
+    
+    <script> loadComment(); </script>
+
+</div>
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/" title="回到主页"><i class="fa fa-home"></i></a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2016/12/23/mybatis-1/" title="下一篇: Mybatis - 各种方式配置">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2017/03/01/thread/">ThreadLocal - 是怎样炼成的</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/12/23/mybatis-1/">Mybatis - 各种方式配置</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/09/20/spring-netfix-register/">Spring Cloud服务发现</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/09/14/spring-config/">Spring Config学习</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/17/codis/">利用Docker安装运行Codis</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/13/jvm-classfile/">我的JVM之旅-ClassFile</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/12/rate-limit5/">系统限流实践 - 接入层限流(下*完结)</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/07/elk/">用ELK搭建简单的日志收集分析系统</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/06/rate-limit4/">系统限流实践 - 接入层限流(上)</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/30/rate-limit3/">系统限流实践 - 分布式限流</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/23/rate-limit2/">系统限流实践 - 应用限流</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/23/rate-limit/">系统限流实践 - 理论篇</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/20/create-hexo-github-site/">利用hexo和github搭建自己的免费博客</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/16/my-new-blog/">终于开通私人博客啦！</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2016-2017 Ray
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.0">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style='display:none'>
+                        <span id="site-visit" >本站到访数: 
+                            <span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>, </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style='display:none'>
+                        <span id="page-visit">本页阅读量: 
+                            <span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 10;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

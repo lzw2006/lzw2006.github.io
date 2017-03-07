@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no" />
+<meta name="author" content="Ray" />
+
+
+
+<meta name="description" content="本文是根据开涛的博客 聊聊高并发系统之限流特技-2 整理而成，自学笔记第二篇
+
+目录1.系统限流实践 - 理论篇2.系统限流实践 - 应用限流3.系统限流实践 - 分布式限流4.系统限流实践 - 接入层限流(上)5.系统限流实践 - 接入层限流(下*完结)
+开篇上篇学习了通过Nginx模块进行限流的方法(传送门)，接下来学习一下利用Nginx+Lua进行接入层限流
+Openresty提供了lua">
+<meta property="og:type" content="article">
+<meta property="og:title" content="系统限流实践 - 接入层限流(下*完结)">
+<meta property="og:url" content="http://lzw2006.github.io/2016/07/12/rate-limit5/index.html">
+<meta property="og:site_name" content="Ray的博客">
+<meta property="og:description" content="本文是根据开涛的博客 聊聊高并发系统之限流特技-2 整理而成，自学笔记第二篇
+
+目录1.系统限流实践 - 理论篇2.系统限流实践 - 应用限流3.系统限流实践 - 分布式限流4.系统限流实践 - 接入层限流(上)5.系统限流实践 - 接入层限流(下*完结)
+开篇上篇学习了通过Nginx模块进行限流的方法(传送门)，接下来学习一下利用Nginx+Lua进行接入层限流
+Openresty提供了lua">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/download-lua-resty-limit-traffic.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/lua-resty-limit-traffic-copy.png">
+<meta property="og:image" content="http://7xsmef.com1.z0.glb.clouddn.com/wechat.png">
+<meta property="og:updated_time" content="2016-12-23T07:45:41.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="系统限流实践 - 接入层限流(下*完结)">
+<meta name="twitter:description" content="本文是根据开涛的博客 聊聊高并发系统之限流特技-2 整理而成，自学笔记第二篇
+
+目录1.系统限流实践 - 理论篇2.系统限流实践 - 应用限流3.系统限流实践 - 分布式限流4.系统限流实践 - 接入层限流(上)5.系统限流实践 - 接入层限流(下*完结)
+开篇上篇学习了通过Nginx模块进行限流的方法(传送门)，接下来学习一下利用Nginx+Lua进行接入层限流
+Openresty提供了lua">
+<meta name="twitter:image" content="http://7xsmef.com1.z0.glb.clouddn.com/download-lua-resty-limit-traffic.png">
+
+<link rel="apple-touch-icon" href= "/apple-touch-icon.png">
+
+
+    <link rel="alternative" href="/atom.xml" title="Ray的博客" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title>系统限流实践 - 接入层限流(下*完结) | Ray的博客</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        open_in_new: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: undefined
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Ray</a></h1>
+        </hgroup>
+
+        
+        <p class="header-subtitle">Java攻城狮|经济小学徒|模型小爱好</p>
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">所有文章</a></li>
+                        
+                            <li><a href="/tags/">标签云</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:rayleung_xyz@126.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                                <a class="fa RSS" target="_blank" href="/atom.xml" title="RSS"></a>
+                            
+                                <a class="fa CSDN" target="_blank" href="http://blog.csdn.net/lzw_2006" title="CSDN"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/JAVA/">JAVA</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/">JVM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mybatis/">Mybatis</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/ORM/">ORM</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/">Thread</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/spring/">spring</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/spring-cloud/">spring-cloud</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/中间件/">中间件</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/其他/">其他</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/基础设施/">基础设施</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/念念碎/">念念碎</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/技术/">技术</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/日志归集/">日志归集</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/架构/">架构</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/系统限流/">系统限流</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a target="_blank" class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                      <a target="_blank" class="main-nav-link switch-friends-link" href="http://lixuanbin.github.io/">秦沙</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">喜欢IT技术，喜欢经济，喜欢模型</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Ray</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Ray</a></h1>
+            </hgroup>
+            
+            <p class="header-subtitle">Java攻城狮|经济小学徒|模型小爱好</p>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">所有文章</a></li>
+                
+                    <li><a href="/tags/">标签云</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:rayleung_xyz@126.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                                <a class="fa RSS" target="_blank" href="/atom.xml" title="RSS"></a>
+                            
+                                <a class="fa CSDN" target="_blank" href="http://blog.csdn.net/lzw_2006" title="CSDN"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我"/>
+</nav>
+      <div class="body-wrap"><article id="post-rate-limit5" class="article article-type-post" itemscope itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2016/07/12/rate-limit5/" class="article-date">
+      <time datetime="2016-07-12T02:34:28.000Z" itemprop="datePublished">2016-07-12</time>
+</a>
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy" />
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      系统限流实践 - 接入层限流(下*完结)
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/技术/">技术</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/架构/">架构</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/系统限流/">系统限流</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <blockquote>
+<p>本文是根据开涛的博客 <a href="http://mp.weixin.qq.com/s?__biz=MzIwODA4NjMwNA==&amp;mid=2652897782&amp;idx=1&amp;sn=cb46b23b2778f14ea3bcc419eb0392ce&amp;scene=1&amp;srcid=0614L7nA5Lma1B73nwTPgerj#rd" target="_blank" rel="external">聊聊高并发系统之限流特技-2</a> 整理而成，自学笔记第二篇</p>
+</blockquote>
+<h1 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h1><p>1.<a href="http://rayleung.xyz/2016/06/23/rate-limit/" target="_blank" rel="external">系统限流实践 - 理论篇</a><br>2.<a href="http://rayleung.xyz/2016/06/23/rate-limit2/" target="_blank" rel="external">系统限流实践 - 应用限流</a><br>3.<a href="http://rayleung.xyz/2016/06/30/rate-limit3/" target="_blank" rel="external">系统限流实践 - 分布式限流</a><br>4.<a href="http://rayleung.xyz/2016/07/06/rate-limit4/" target="_blank" rel="external">系统限流实践 - 接入层限流(上)</a><br>5.<a href="http://rayleung.xyz/2016/07/12/rate-limit5/" target="_blank" rel="external">系统限流实践 - 接入层限流(下*完结)</a></p>
+<h1 id="开篇"><a href="#开篇" class="headerlink" title="开篇"></a>开篇</h1><p>上篇学习了通过Nginx模块进行限流的方法(<a href="http://rayleung.xyz/2016/06/30/rate-limit4/" target="_blank" rel="external">传送门</a>)，接下来学习一下利用Nginx+Lua进行接入层限流</p>
+<p>Openresty提供了<strong>lua-resty-limit-traffic</strong>模块进行限流，模块实现了<strong>limit.conn</strong>和<strong>limit.req</strong>的功能和算法。<a href="https://github.com/openresty/lua-resty-limit-traffic" target="_blank" rel="external">参考链接</a></p>
+<a id="more"></a>
+<h1 id="实践"><a href="#实践" class="headerlink" title="实践"></a>实践</h1><h2 id="添加模块"><a href="#添加模块" class="headerlink" title="添加模块"></a>添加模块</h2><p>这里使用的是windows的openresty环境，具体安装配置请参考<a href="http://rayleung.xyz/2016/06/30/rate-limit3/#安装Openresty-Windows" target="_blank" rel="external">windows版openresty安装</a>或者自行百度<br>首先需要下载<strong>lua-resty-limit-traffic</strong>模块<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/download-lua-resty-limit-traffic.png" alt="下载zip文件"><br>然后把zip包解压出来，进入lib/resty目录下，会看到有一个叫limit文件夹，里面存放的就是我们需要的模块；最后把limit文件夹复制拷贝到openresty根目录下的nginx/resty目录下<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/lua-resty-limit-traffic-copy.png" alt="拷贝文件"></p>
+<h2 id="resty-limit-req模块"><a href="#resty-limit-req模块" class="headerlink" title="resty.limit.req模块"></a>resty.limit.req模块</h2><p>resty.limit.req使用<strong>漏桶算法</strong>，它与Nginx的标准模块<strong>ngx_limit_req</strong>类似，不过<strong>resty.limit.req</strong>使用更灵活，可以在绝大部分的上下文上使用<br><a href="https://github.com/openresty/lua-resty-limit-traffic/blob/master/lib/resty/limit/req.md" target="_blank" rel="external">参考链接</a></p>
+<h3 id="示例"><a href="#示例" class="headerlink" title="示例"></a>示例</h3><figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div></pre></td><td class="code"><pre><div class="line"># 展示如何单独使用resty.limit.req模块</div><div class="line">http &#123;</div><div class="line">    lua_shared_dict my_limit_req_store 100m;</div><div class="line"></div><div class="line">    server &#123;</div><div class="line">        location / &#123;</div><div class="line">            access_by_lua '</div><div class="line"></div><div class="line">                local limit_req = require "resty.limit.req"</div><div class="line"></div><div class="line">                -- 限制请求速率为200 req/sec，并且允许100 req/sec的突发请求</div><div class="line">                -- 就是说我们会把200以上300一下的请求请求给延迟</div><div class="line">                -- 超过300的请求将会被拒绝</div><div class="line">                local lim, err = limit_req.new("my_limit_req_store", 200, 100)</div><div class="line">                if not lim then --申请limit_req对象失败</div><div class="line">                    ngx.log(ngx.ERR,</div><div class="line">                            "failed to instantiate a resty.limit.req object: ", err)</div><div class="line">                    return ngx.exit(500)</div><div class="line">                end</div><div class="line"></div><div class="line">                -- 下面代码针对每一个单独的请求</div><div class="line">                -- 使用ip地址作为限流的key</div><div class="line">                local key = ngx.var.binary_remote_addr</div><div class="line">                local delay, err = lim:incoming(key, true)</div><div class="line">                if not delay then</div><div class="line">                    if err == "rejected" then</div><div class="line">                        return ngx.exit(503)</div><div class="line">                    end</div><div class="line">                    ngx.log(ngx.ERR, "failed to limit req: ", err)</div><div class="line">                    return ngx.exit(500)</div><div class="line">                end</div><div class="line"></div><div class="line">                if delay &gt; 0 then</div><div class="line">                    -- 第二个参数(err)保存着超过请求速率的请求数</div><div class="line">                    -- 例如err等于31，意味着当前速率是231 req/sec</div><div class="line">                    local excess = err</div><div class="line"></div><div class="line">                    -- 当前请求超过200 req/sec 但小于 300 req/sec</div><div class="line">                    -- 因此我们sleep一下，保证速率是200 req/sec，请求延迟处理</div><div class="line">                    ngx.sleep(delay) --非阻塞sleep(秒)</div><div class="line">                end</div><div class="line">            ';</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line">&#125;</div><div class="line">`</div></pre></td></tr></table></figure>
+<h3 id="方法说明"><a href="#方法说明" class="headerlink" title="方法说明"></a>方法说明</h3><h4 id="new"><a href="#new" class="headerlink" title="new"></a>new</h4><p>语法: <code>obj, err = class.new(shdict_name, rate, burst)</code><br>成功的话会返回<code>resty.limit.req</code>对象，失败的话返回<code>nil</code>和一个描述错误原因的字符串值</p>
+<h4 id="incoming"><a href="#incoming" class="headerlink" title="incoming"></a>incoming</h4><p>语法: <code>delay, err = obj:incoming(key, commit)</code><br>key这里是指需要限流的ip；commit真心没看懂(囧)，先按照例子传true<br>返回值根据情况的不同返回不同的值<br>1.如果请求没超过速率，那么delay和err返回0<br>2.如果请求超过速率但没超过“速率+burst”的值，那么delay将会返回一个合适的秒数，告诉你多久后这个请求才会被处理；第二个参数(err)保存着超过请求速率的请求数量<br>3.如果请求超过“速率+burst”的值，那么delay会返回nil，err会返回”rejected”字符串<br>4.如果一个error发生了，delay会返回nil，err会返回具体错误的字符串描述</p>
+<p>inconing方法不会sleep自己，需要调用者调用’ngx.sleep’去延迟请求处理。</p>
+<h2 id="配置共享字典"><a href="#配置共享字典" class="headerlink" title="配置共享字典"></a>配置共享字典</h2><figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">http &#123;</div><div class="line">    ......</div><div class="line">    lua_shared_dict limit_req_store 10m;</div><div class="line">    ......</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<h2 id="编写限流脚本"><a href="#编写限流脚本" class="headerlink" title="编写限流脚本"></a>编写限流脚本</h2><p>resty-limit.lua<br><figure class="highlight lua"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">local</span> limit_req = <span class="built_in">require</span> <span class="string">"resty.limit.req"</span></div><div class="line"><span class="keyword">local</span> rate = <span class="number">2</span> <span class="comment">--固定平均速率2r/s</span></div><div class="line"><span class="keyword">local</span> burst = <span class="number">10</span> <span class="comment">--桶容量</span></div><div class="line"><span class="keyword">local</span> error_status = <span class="number">503</span></div><div class="line"><span class="keyword">local</span> nodelay = <span class="keyword">false</span> <span class="comment">--是否需要不延迟处理</span></div><div class="line"></div><div class="line"><span class="keyword">local</span> lim, err = limit_req.new(<span class="string">"limit_req_store"</span>, rate, burst)</div><div class="line"><span class="keyword">if</span> <span class="keyword">not</span> lim <span class="keyword">then</span> <span class="comment">--没定义共享字典</span></div><div class="line">    ngx.exit(error_status)</div><div class="line"><span class="keyword">end</span></div><div class="line"></div><div class="line"><span class="keyword">local</span> key = ngx.var.binary_remote_addr <span class="comment">--IP维度限流</span></div><div class="line"><span class="comment">--请求流入，如果你的请求需要被延迟则返回delay&gt;0</span></div><div class="line"><span class="keyword">local</span> delay, err = lim:incoming(key, <span class="keyword">true</span>)</div><div class="line"></div><div class="line"><span class="keyword">if</span> <span class="keyword">not</span> delay <span class="keyword">and</span> err == <span class="string">"rejected"</span> <span class="keyword">then</span></div><div class="line">    ngx.exit(error_status)</div><div class="line"><span class="keyword">end</span></div><div class="line"></div><div class="line"><span class="keyword">if</span> delay &gt; <span class="number">0</span> <span class="keyword">then</span> <span class="comment">--根据需要决定延迟或者不延迟处理</span></div><div class="line">    <span class="keyword">if</span> nodelay <span class="keyword">then</span></div><div class="line">        <span class="comment">--直接突发处理</span></div><div class="line">    <span class="keyword">else</span></div><div class="line">        ngx.sleep(delay) <span class="comment">--延迟处理</span></div><div class="line">    <span class="keyword">end</span></div><div class="line"><span class="keyword">end</span></div></pre></td></tr></table></figure></p>
+<h2 id="配置nginx-conf"><a href="#配置nginx-conf" class="headerlink" title="配置nginx.conf"></a>配置nginx.conf</h2><figure class="highlight"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">http &#123;</div><div class="line">    ......</div><div class="line">    server &#123;</div><div class="line">        location /resty-limit &#123;</div><div class="line">            access_by_lua_file /path/to/your/resty-limit.lua;</div><div class="line">            echo "you success";</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line">    ......</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>把限流的配置放在nginx的access阶段，如果限流的话，不会输出<code>you success</code>。</p>
+<h2 id="测试"><a href="#测试" class="headerlink" title="测试"></a>测试</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">NginxLimit</span> </span>&#123;</div><div class="line"></div><div class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> IOException, InterruptedException </span>&#123;</div><div class="line">        <span class="keyword">final</span> NginxLimit distrubuteLimit = <span class="keyword">new</span> NginxLimit();</div><div class="line">        <span class="keyword">final</span> CountDownLatch latch = <span class="keyword">new</span> CountDownLatch(<span class="number">1</span>);<span class="comment">//两个工人的协作</span></div><div class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10</span>; i++) &#123;</div><div class="line">            <span class="keyword">final</span> <span class="keyword">int</span> finalI = i;</div><div class="line">            Thread t = <span class="keyword">new</span> Thread(<span class="keyword">new</span> Runnable() &#123;</div><div class="line">                <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</div><div class="line">                    <span class="keyword">try</span> &#123;</div><div class="line">                        latch.await();</div><div class="line">                        String rev = distrubuteLimit.sendGet(<span class="string">"http://localhost:9998/resty-limit"</span>, <span class="keyword">null</span>);</div><div class="line">                        System.out.println(rev);</div><div class="line">                    &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;</div><div class="line">                        e.printStackTrace();</div><div class="line">                    &#125;</div><div class="line">                &#125;</div><div class="line">            &#125;);</div><div class="line">            t.start();</div><div class="line">        &#125;</div><div class="line">        latch.countDown();</div><div class="line">        System.in.read();</div><div class="line">    &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>并发产生10个请求</p>
+<h2 id="结果"><a href="#结果" class="headerlink" title="结果"></a>结果</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line">you success</div><div class="line">发送GET请求出现异常</div><div class="line">发送GET请求出现异常</div><div class="line">发送GET请求出现异常</div><div class="line">发送GET请求出现异常</div><div class="line">发送GET请求出现异常</div><div class="line">发送GET请求出现异常</div><div class="line">you success</div><div class="line">you success</div><div class="line">you success</div></pre></td></tr></table></figure>
+<p>根据lua文件的配置，10个请求里应该有5个成功，5个失败，但是实际观察只有4个成功，与设想有点误差。试过用不同的配置去测试，都一直存在这个问题，误差为1,这里可以在以后研究为什么出现这个问题。</p>
+<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><p><strong>ngx_limit_req</strong>配置上更加灵活，不过测试中发现有一个缺点，就是与nginx的<strong>ngx_http_limit_req_module</strong>没有允许一定程度的并发。大家可以根据各自的使用场景决定用那种发发实现限流。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p><a href="http://mp.weixin.qq.com/s?__biz=MzIwODA4NjMwNA==&amp;mid=2652897782&amp;idx=1&amp;sn=cb46b23b2778f14ea3bcc419eb0392ce&amp;scene=1&amp;srcid=0614L7nA5Lma1B73nwTPgerj#rd" target="_blank" rel="external">聊聊高并发系统之限流特技-2</a><br><a href="https://github.com/openresty/lua-resty-limit-traffic" target="_blank" rel="external">lua-resty-limit-traffic - https://github.com/openresty/lua-resty-limit-traffic</a></p>
+<p>欢迎关注个人公众号<br><img src="http://7xsmef.com1.z0.glb.clouddn.com/wechat.png" alt="Ray乐园"></p>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2016/07/12/rate-limit5/">系统限流实践 - 接入层限流(下*完结)</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Ray</a></p>
+        <p><span>发布时间:</span>2016-07-12, 10:34:28</p>
+        <p><span>最后更新:</span>2016-12-23, 15:45:41</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2016/07/12/rate-limit5/" title="系统限流实践 - 接入层限流(下*完结)">http://lzw2006.github.io/2016/07/12/rate-limit5/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://lzw2006.github.io/2016/07/12/rate-limit5/　　作者: Ray" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target = "_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2016/07/13/jvm-classfile/">
+                    我的JVM之旅-ClassFile
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2016/07/07/elk/">
+                    用ELK搭建简单的日志收集分析系统
+                </a>
+            </div>
+        
+    </nav>
+
+
+<!-- 打赏代码 -->
+<div class="post-donate">
+    <div id="donate_board" class="donate_bar center">
+        <a id="btn_donate" class="btn_donate" href="javascript:;" title="Donate 打赏" target="_blank"></a>
+        <span class="donate_txt">
+           ↑<br>
+
+            欣赏此文？赏份狗粮！
+
+        </span>
+        <br>
+    </div>
+
+    <div id="donate_guide" class="donate_bar center hidden">
+
+        <a href="http://7xsmef.com1.z0.glb.clouddn.com/ali_pay.png" title="支付宝打赏" class="fancybox" rel="article0" style="float:left;margin-left:25%;margin-right:2px;" target="_blank">
+            <img src="http://7xsmef.com1.z0.glb.clouddn.com/ali_pay.png" title="支付宝打赏" height="164px" width="164px">
+        </a>
+
+
+
+        <a href="http://7xsmef.com1.z0.glb.clouddn.com/wechat_pay.JPG" title="微信打赏" class="fancybox" rel="article0" target="_blank">
+            <img src="http://7xsmef.com1.z0.glb.clouddn.com/wechat_pay.JPG" title="微信打赏" height="164px" width="164px">
+        </a>
+
+
+    </div>
+
+    <script type="text/javascript">
+        document.getElementById('btn_donate').onclick = function(){
+            $('#donate_board').addClass('hidden');
+            $('#donate_guide').removeClass('hidden');
+        }
+    </script>
+</div>
+<!-- 打赏代码END -->
+  
+</article>
+
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#目录"><span class="toc-number">1.</span> <span class="toc-text">目录</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#开篇"><span class="toc-number">2.</span> <span class="toc-text">开篇</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#实践"><span class="toc-number">3.</span> <span class="toc-text">实践</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#添加模块"><span class="toc-number">3.1.</span> <span class="toc-text">添加模块</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#resty-limit-req模块"><span class="toc-number">3.2.</span> <span class="toc-text">resty.limit.req模块</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#示例"><span class="toc-number">3.2.1.</span> <span class="toc-text">示例</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#方法说明"><span class="toc-number">3.2.2.</span> <span class="toc-text">方法说明</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#new"><span class="toc-number">3.2.2.1.</span> <span class="toc-text">new</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#incoming"><span class="toc-number">3.2.2.2.</span> <span class="toc-text">incoming</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#配置共享字典"><span class="toc-number">3.3.</span> <span class="toc-text">配置共享字典</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#编写限流脚本"><span class="toc-number">3.4.</span> <span class="toc-text">编写限流脚本</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#配置nginx-conf"><span class="toc-number">3.5.</span> <span class="toc-text">配置nginx.conf</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#测试"><span class="toc-number">3.6.</span> <span class="toc-text">测试</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#结果"><span class="toc-number">3.7.</span> <span class="toc-text">结果</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#总结"><span class="toc-number">4.</span> <span class="toc-text">总结</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#参考资料"><span class="toc-number">5.</span> <span class="toc-text">参考资料</span></a></li></ol>
+</div>
+<style>
+    .left-col .switch-btn,
+    .left-col .switch-area {
+        display: none;
+    }
+</style>
+
+<input type="button" id="tocButton" value="隐藏目录"  title="点击按钮隐藏或者显示文章目录">
+
+<script>
+    yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+</script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></i></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":"系统限流实践 - 接入层限流(下*完结)　| Ray的博客　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+      <div class="duoshuo" id="comments">
+    <div id="comment-box" ></div>
+    <div class="ds-thread" data-thread-key="2016/07/12/rate-limit5/" data-title="系统限流实践 - 接入层限流(下*完结)" data-url="http://lzw2006.github.io/2016/07/12/rate-limit5/"></div>
+    <script>
+        var duoshuoQuery = {short_name:"rayleung"};
+        var loadComment = function(){
+            var d = document, s = d.createElement('script');
+            s.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+            s.async = true; s.charset = 'UTF-8';
+            (d.head || d.body).appendChild(s);
+        }
+
+        
+    </script>
+    
+    <script> loadComment(); </script>
+
+</div>
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2016/07/13/jvm-classfile/" title="上一篇: 我的JVM之旅-ClassFile">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2016/07/07/elk/" title="下一篇: 用ELK搭建简单的日志收集分析系统">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2017/03/01/thread/">ThreadLocal - 是怎样炼成的</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/12/23/mybatis-1/">Mybatis - 各种方式配置</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/09/20/spring-netfix-register/">Spring Cloud服务发现</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/09/14/spring-config/">Spring Config学习</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/17/codis/">利用Docker安装运行Codis</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/13/jvm-classfile/">我的JVM之旅-ClassFile</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/12/rate-limit5/">系统限流实践 - 接入层限流(下*完结)</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/07/elk/">用ELK搭建简单的日志收集分析系统</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/06/rate-limit4/">系统限流实践 - 接入层限流(上)</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/30/rate-limit3/">系统限流实践 - 分布式限流</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/23/rate-limit2/">系统限流实践 - 应用限流</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/23/rate-limit/">系统限流实践 - 理论篇</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/20/create-hexo-github-site/">利用hexo和github搭建自己的免费博客</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/16/my-new-blog/">终于开通私人博客啦！</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2016-2017 Ray
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.0">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style='display:none'>
+                        <span id="site-visit" >本站到访数: 
+                            <span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>, </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style='display:none'>
+                        <span id="page-visit">本页阅读量: 
+                            <span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 10;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>
